@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.vite/
+coverage/
+
+bin/
+tmp/
+vendor/
+
+.env
+.env.local
+
+.cache/
+apps/backend/.cache/
+apps/backend/tmp/
+
+postgres-data/

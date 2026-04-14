@@ -1,0 +1,73 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    working_dir: /workspace/apps/frontend
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port ${FRONTEND_PORT:-5173}"
+    ports:
+      - "${FRONTEND_PORT:-5173}:${FRONTEND_PORT:-5173}"
+    volumes:
+      - .:/workspace
+      - frontend_node_modules:/workspace/apps/frontend/node_modules
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+    networks:
+      - flashpay-network
+    depends_on:
+      backend:
+        condition: service_started
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    working_dir: /workspace/apps/backend
+    command: sh -c "go run ./cmd/api"
+    ports:
+      - "${BACKEND_PORT:-8080}:${BACKEND_PORT:-8080}"
+    volumes:
+      - .:/workspace
+      - go_mod_cache:/go/pkg/mod
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      PORT: ${BACKEND_PORT:-8080}
+      CORS_ALLOWED_ORIGIN: ${CORS_ALLOWED_ORIGIN:-http://localhost:5173}
+      DB_HOST: postgres
+      DB_PORT: ${POSTGRES_PORT:-5432}
+      DB_NAME: ${POSTGRES_DB:-flashpay}
+      DB_USER: ${POSTGRES_USER:-flashpay}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-flashpay}
+    networks:
+      - flashpay-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-flashpay}
+      POSTGRES_USER: ${POSTGRES_USER:-flashpay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flashpay}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - flashpay-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flashpay} -d ${POSTGRES_DB:-flashpay}"]
+      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+networks:
+  flashpay-network:
+    driver: bridge
+
+volumes:
+  frontend_node_modules:
+  go_mod_cache:
+  postgres_data:
