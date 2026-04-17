@@ -43,7 +43,7 @@ docker compose up --build
 ```bash
 npm run dev:frontend
 npm run build:frontend
-go run ./apps/backend/cmd/api
+go run ./apps/backend/cmd/server
 ```
 
 ## Serviços
@@ -51,7 +51,10 @@ go run ./apps/backend/cmd/api
 - Frontend: `http://localhost:5173`
 - Backend: `http://localhost:8080`
 - Healthcheck backend: `http://localhost:8080/health`
-- PostgreSQL: `localhost:5432`
+- Metrics backend: `http://localhost:8080/metrics`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3001`
+- PostgreSQL: `localhost:5433`
 
 ## Observações
 

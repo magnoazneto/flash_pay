@@ -6,13 +6,15 @@ import (
 	"net/http"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/flashpay/backend/pkg/config"
+	"github.com/flashpay/backend/pkg/database"
+	apimiddleware "github.com/flashpay/backend/pkg/middleware"
 	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/flashpay/backend/pkg/config"
-	"github.com/flashpay/backend/pkg/database"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type healthResponse struct {
@@ -23,6 +25,7 @@ type healthResponse struct {
 
 func main() {
 	cfg := config.Load()
+	waitForDB(cfg.DatabaseURL)
 	runMigrations(cfg.DatabaseURL)
 
 	db, err := database.OpenPostgres(cfg.DatabaseURL)
@@ -36,7 +39,9 @@ func main() {
 	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
+	r.Use(apimiddleware.PrometheusMetrics)
 	r.Get("/health", healthHandler)
+	r.Handle("/metrics", promhttp.Handler())
 
 	address := ":" + cfg.AppPort
 
@@ -45,6 +50,23 @@ func main() {
 	if err := http.ListenAndServe(address, withCORS(r, cfg.CORSAllowedOrigin)); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func waitForDB(databaseURL string) {
+	const maxAttempts = 10
+	const delay = 2 * time.Second
+
+	for i := range maxAttempts {
+		db, err := database.OpenPostgres(databaseURL)
+		if err == nil {
+			db.Close()
+			return
+		}
+		log.Printf("waiting for database (attempt %d/%d): %v", i+1, maxAttempts, err)
+		time.Sleep(delay)
+	}
+
+	log.Fatal("database not reachable after maximum attempts")
 }
 
 func runMigrations(databaseURL string) {

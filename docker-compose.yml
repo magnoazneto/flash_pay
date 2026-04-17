@@ -42,14 +42,54 @@ services:
       start_period: 10s
     networks:
       - flashpay-net
+    restart: on-failure
     depends_on:
       postgres:
         condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./infra/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - flashpay-net
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - flashpay-net
+    depends_on:
+      prometheus:
+        condition: service_started
 
   postgres:
     image: postgres:15-alpine
     env_file:
       - .env
+    ports:
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
@@ -67,4 +107,6 @@ networks:
 
 volumes:
   go_mod_cache:
+  grafana_data:
+  prometheus_data:
   pgdata:
