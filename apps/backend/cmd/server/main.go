@@ -60,6 +60,16 @@ func main() {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claims)
 		})
+		r.Route("/admin", func(r chi.Router) {
+			r.Use(apimiddleware.RequireRole("admin"))
+			r.Get("/users", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_ = json.NewEncoder(w).Encode(map[string]string{
+					"message": "admin users endpoint - coming soon",
+				})
+			})
+		})
 	})
 
 	address := ":" + cfg.AppPort
