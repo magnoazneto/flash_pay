@@ -53,6 +53,14 @@ func main() {
 		r.Post("/register", authHandler.Register)
 		r.Post("/login", authHandler.Login)
 	})
+	r.Route("/api", func(r chi.Router) {
+		r.Use(apimiddleware.Auth)
+		r.Get("/me", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := apimiddleware.GetUserClaims(r.Context())
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(claims)
+		})
+	})
 
 	address := ":" + cfg.AppPort
 

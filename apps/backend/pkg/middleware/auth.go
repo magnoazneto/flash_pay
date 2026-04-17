@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -28,19 +29,23 @@ func SetJWTSecret(secret string) {
 func Auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if len(jwtSecret) == 0 {
-			http.Error(w, "auth middleware not configured", http.StatusInternalServerError)
+			respondJSONError(w, http.StatusInternalServerError, "auth middleware not configured")
 			return
 		}
 
 		authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
+		if authHeader == "" {
+			respondUnauthorized(w, "missing authorization header")
+			return
+		}
 		if !strings.HasPrefix(authHeader, "Bearer ") {
-			http.Error(w, "missing bearer token", http.StatusUnauthorized)
+			respondUnauthorized(w, "invalid authorization header format")
 			return
 		}
 
 		tokenString := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
 		if tokenString == "" {
-			http.Error(w, "missing bearer token", http.StatusUnauthorized)
+			respondUnauthorized(w, "invalid authorization header format")
 			return
 		}
 
@@ -51,23 +56,28 @@ func Auth(next http.Handler) http.Handler {
 			return jwtSecret, nil
 		})
 		if err != nil || !token.Valid {
-			http.Error(w, "invalid token", http.StatusUnauthorized)
+			respondUnauthorized(w, "invalid or expired token")
 			return
 		}
 
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
-			http.Error(w, "invalid token claims", http.StatusUnauthorized)
+			respondUnauthorized(w, "invalid token claims")
 			return
 		}
 
 		userClaims, ok := mapClaimsToUserClaims(claims)
 		if !ok {
-			http.Error(w, "invalid token claims", http.StatusUnauthorized)
+			respondUnauthorized(w, "invalid token claims")
 			return
 		}
 
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userClaimsContextKey, userClaims)))
+		ctx := context.WithValue(r.Context(), userClaimsContextKey, userClaims)
+		ctx = context.WithValue(ctx, ContextKeyUserID, userClaims.UserID)
+		ctx = context.WithValue(ctx, ContextKeyEmail, userClaims.Email)
+		ctx = context.WithValue(ctx, ContextKeyRole, userClaims.Role)
+
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -97,4 +107,14 @@ func mapClaimsToUserClaims(claims jwt.MapClaims) (UserClaims, bool) {
 		Email:  email,
 		Role:   role,
 	}, true
+}
+
+func respondUnauthorized(w http.ResponseWriter, msg string) {
+	respondJSONError(w, http.StatusUnauthorized, msg)
+}
+
+func respondJSONError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
