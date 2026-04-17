@@ -7,4 +7,5 @@ var (
 	ErrEmailAlreadyExists = errors.New("email already exists")
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrValidation         = errors.New("validation error")
+	ErrCannotDeleteSelf   = errors.New("cannot delete your own account")
 )

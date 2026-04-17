@@ -37,6 +37,8 @@ func main() {
 	defer db.Close()
 
 	userRepository := user.NewPostgresRepository(db)
+	userService := user.NewService(userRepository)
+	userHandler := user.NewHandler(userService)
 	authService := auth.NewService(userRepository, cfg.JWTSecret, cfg.JWTExpirationHours)
 	authHandler := auth.NewHandler(authService)
 	apimiddleware.SetJWTSecret(cfg.JWTSecret)
@@ -62,13 +64,9 @@ func main() {
 		})
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(apimiddleware.RequireRole("admin"))
-			r.Get("/users", func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				_ = json.NewEncoder(w).Encode(map[string]string{
-					"message": "admin users endpoint - coming soon",
-				})
-			})
+			r.Get("/users", userHandler.ListUsers)
+			r.Patch("/users/{id}/role", userHandler.UpdateRole)
+			r.Delete("/users/{id}", userHandler.DeleteUser)
 		})
 	})
 
