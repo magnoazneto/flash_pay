@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/flashpay/backend/internal/auth"
+	"github.com/flashpay/backend/internal/user"
 	"github.com/flashpay/backend/pkg/config"
 	"github.com/flashpay/backend/pkg/database"
 	apimiddleware "github.com/flashpay/backend/pkg/middleware"
@@ -34,6 +36,11 @@ func main() {
 	}
 	defer db.Close()
 
+	userRepository := user.NewPostgresRepository(db)
+	authService := auth.NewService(userRepository, cfg.JWTSecret, cfg.JWTExpirationHours)
+	authHandler := auth.NewHandler(authService)
+	apimiddleware.SetJWTSecret(cfg.JWTSecret)
+
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
@@ -42,6 +49,10 @@ func main() {
 	r.Use(apimiddleware.PrometheusMetrics)
 	r.Get("/health", healthHandler)
 	r.Handle("/metrics", promhttp.Handler())
+	r.Route("/api/auth", func(r chi.Router) {
+		r.Post("/register", authHandler.Register)
+		r.Post("/login", authHandler.Login)
+	})
 
 	address := ":" + cfg.AppPort
 
@@ -114,6 +125,9 @@ func withCORS(next http.Handler, origin string) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if origin != "*" {
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
