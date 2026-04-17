@@ -1,33 +1,31 @@
 services:
   frontend:
     build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
-    working_dir: /workspace/apps/frontend
+      context: ./apps/frontend
+    working_dir: /app
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port ${FRONTEND_PORT:-5173}"
     ports:
       - "${FRONTEND_PORT:-5173}:${FRONTEND_PORT:-5173}"
     volumes:
-      - .:/workspace
-      - frontend_node_modules:/workspace/apps/frontend/node_modules
+      - ./apps/frontend:/app
+      - /app/node_modules
     environment:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
     networks:
-      - flashpay-network
+      - flashpay-net
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
 
   backend:
     build:
-      context: .
-      dockerfile: apps/backend/Dockerfile
-    working_dir: /workspace/apps/backend
+      context: ./apps/backend
+    working_dir: /app
     command: sh -c "go run ./cmd/api"
     ports:
       - "${BACKEND_PORT:-8080}:${BACKEND_PORT:-8080}"
     volumes:
-      - .:/workspace
+      - ./apps/backend:/app
       - go_mod_cache:/go/pkg/mod
     environment:
       APP_ENV: ${APP_ENV:-development}
@@ -38,36 +36,39 @@ services:
       DB_NAME: ${POSTGRES_DB:-flashpay}
       DB_USER: ${POSTGRES_USER:-flashpay}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-flashpay}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${BACKEND_PORT:-8080}/health >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
-      - flashpay-network
+      - flashpay-net
     depends_on:
       postgres:
         condition: service_healthy
 
   postgres:
-    image: postgres:16-alpine
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    image: postgres:15-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-flashpay}
       POSTGRES_USER: ${POSTGRES_USER:-flashpay}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flashpay}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     networks:
-      - flashpay-network
+      - flashpay-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flashpay} -d ${POSTGRES_DB:-flashpay}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       start_period: 10s
       interval: 5s
       timeout: 5s
       retries: 10
 
 networks:
-  flashpay-network:
+  flashpay-net:
     driver: bridge
 
 volumes:
-  frontend_node_modules:
   go_mod_cache:
-  postgres_data:
+  pgdata:
