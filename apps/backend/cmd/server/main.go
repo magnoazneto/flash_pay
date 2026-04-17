@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
+	"time"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/chi/v5"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/flashpay/backend/pkg/config"
+	"github.com/flashpay/backend/pkg/database"
 )
 
 type healthResponse struct {
@@ -18,17 +22,27 @@ type healthResponse struct {
 }
 
 func main() {
-	runMigrations(os.Getenv("DATABASE_URL"))
+	cfg := config.Load()
+	runMigrations(cfg.DatabaseURL)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/health", healthHandler)
+	db, err := database.OpenPostgres(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("failed to open database connection: %v", err)
+	}
+	defer db.Close()
 
-	port := envOrDefault("PORT", "8080")
-	address := ":" + port
+	r := chi.NewRouter()
+	r.Use(chimiddleware.RequestID)
+	r.Use(chimiddleware.RealIP)
+	r.Use(chimiddleware.Logger)
+	r.Use(chimiddleware.Recoverer)
+	r.Get("/health", healthHandler)
+
+	address := ":" + cfg.AppPort
 
 	log.Printf("flashpay backend listening on %s", address)
 
-	if err := http.ListenAndServe(address, withCORS(mux)); err != nil {
+	if err := http.ListenAndServe(address, withCORS(r, cfg.CORSAllowedOrigin)); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -63,7 +77,7 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	response := healthResponse{
 		Service:     "flashpay-backend",
 		Status:      "ok",
-		Environment: envOrDefault("APP_ENV", "development"),
+		Environment: config.Environment(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -73,9 +87,9 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-func withCORS(next http.Handler) http.Handler {
+func withCORS(next http.Handler, origin string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", envOrDefault("CORS_ALLOWED_ORIGIN", "http://localhost:5173"))
+		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
@@ -88,10 +102,6 @@ func withCORS(next http.Handler) http.Handler {
 	})
 }
 
-func envOrDefault(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-
-	return fallback
+func init() {
+	http.DefaultClient.Timeout = 5 * time.Second
 }

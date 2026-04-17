@@ -25,7 +25,7 @@ migrate-down:
 
 migrate-create:
 	@read -p "Nome da migration: " name; \
-	$(MIGRATE) create -ext sql -dir /app/migrations -seq $$name
+	$(MIGRATE) create -ext sql -dir /app/migrations $$name
 
 migrate-status:
 	$(MIGRATE) -path /app/migrations -database "$(DB_URL)" version

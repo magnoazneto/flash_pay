@@ -6,7 +6,7 @@ type HealthResponse = {
   environment: string;
 };
 
-const apiUrl = import.meta.env.VITE_API_URL ?? "/api";
+const apiUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 export default function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);

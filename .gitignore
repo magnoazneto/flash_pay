@@ -6,6 +6,7 @@ coverage/
 bin/
 tmp/
 vendor/
+apps/backend/server
 
 .env
 .env.local
@@ -15,3 +16,5 @@ apps/backend/.cache/
 apps/backend/tmp/
 
 postgres-data/
+
+scripts/
