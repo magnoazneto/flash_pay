@@ -1,4 +1,10 @@
-.PHONY: up down logs migrate-up migrate-down
+.PHONY: up down logs migrate-up migrate-down migrate-create migrate-status
+
+POSTGRES_USER ?= flashpay
+POSTGRES_PASSWORD ?= flashpay
+POSTGRES_DB ?= flashpay
+DB_URL=postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)?sslmode=disable
+MIGRATE=docker compose exec backend migrate
 
 up:
 	docker compose up --build -d
@@ -10,7 +16,14 @@ logs:
 	docker compose logs -f
 
 migrate-up:
-	docker compose exec backend migrate -path /app/migrations -database "$$DATABASE_URL" up
+	$(MIGRATE) -path /app/migrations -database "$(DB_URL)" up
 
 migrate-down:
-	docker compose exec backend migrate -path /app/migrations -database "$$DATABASE_URL" down 1
+	$(MIGRATE) -path /app/migrations -database "$(DB_URL)" down 1
+
+migrate-create:
+	@read -p "Nome da migration: " name; \
+	$(MIGRATE) create -ext sql -dir /app/migrations -seq $$name
+
+migrate-status:
+	$(MIGRATE) -path /app/migrations -database "$(DB_URL)" version
