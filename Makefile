@@ -1,8 +1,10 @@
 .PHONY: up down logs migrate-up migrate-down migrate-create migrate-status
 
-POSTGRES_USER ?= flashpay
-POSTGRES_PASSWORD ?= flashpay
-POSTGRES_DB ?= flashpay
+ifneq (,$(wildcard .env))
+  include .env
+  export
+endif
+
 DB_URL=postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)?sslmode=disable
 MIGRATE=docker compose exec backend migrate
 
