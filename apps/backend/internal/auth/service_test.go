@@ -14,6 +14,9 @@ import (
 type stubUserRepository struct {
 	findByEmailFn func(ctx context.Context, email string) (domain.User, error)
 	createFn      func(ctx context.Context, user domain.User) (domain.User, error)
+	listUsersFn   func(ctx context.Context, limit, offset int) ([]domain.User, int, error)
+	updateRoleFn  func(ctx context.Context, userID, role string) error
+	deleteUserFn  func(ctx context.Context, userID string) error
 }
 
 func (s stubUserRepository) FindByID(context.Context, string) (domain.User, error) {
@@ -26,6 +29,30 @@ func (s stubUserRepository) FindByEmail(ctx context.Context, email string) (doma
 
 func (s stubUserRepository) Create(ctx context.Context, user domain.User) (domain.User, error) {
 	return s.createFn(ctx, user)
+}
+
+func (s stubUserRepository) ListUsers(ctx context.Context, limit, offset int) ([]domain.User, int, error) {
+	if s.listUsersFn == nil {
+		return nil, 0, nil
+	}
+
+	return s.listUsersFn(ctx, limit, offset)
+}
+
+func (s stubUserRepository) UpdateRole(ctx context.Context, userID, role string) error {
+	if s.updateRoleFn == nil {
+		return nil
+	}
+
+	return s.updateRoleFn(ctx, userID, role)
+}
+
+func (s stubUserRepository) DeleteUser(ctx context.Context, userID string) error {
+	if s.deleteUserFn == nil {
+		return nil
+	}
+
+	return s.deleteUserFn(ctx, userID)
 }
 
 func TestServiceRegister(t *testing.T) {

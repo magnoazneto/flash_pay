@@ -1,35 +1,35 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react'
 
 type HealthResponse = {
   service: string;
   status: string;
   environment: string;
-};
+}
 
-const apiUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+const apiUrl = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
 export default function App() {
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [health, setHealth] = useState<HealthResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadHealth() {
       try {
-        const response = await fetch(`${apiUrl}/health`);
+        const response = await fetch(`${apiUrl}/health`)
 
         if (!response.ok) {
-          throw new Error(`Falha ao consultar API: ${response.status}`);
+          throw new Error(`Falha ao consultar API: ${response.status}`)
         }
 
-        const data = (await response.json()) as HealthResponse;
-        setHealth(data);
+        const data = (await response.json()) as HealthResponse
+        setHealth(data)
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Erro inesperado");
+        setError(err instanceof Error ? err.message : 'Erro inesperado')
       }
     }
 
-    void loadHealth();
-  }, []);
+    void loadHealth()
+  }, [])
 
   return (
     <main className="app-shell">
@@ -64,9 +64,9 @@ export default function App() {
             </div>
           </dl>
         ) : (
-          <p>{error ?? "Consultando backend..."}</p>
+          <p>{error ?? 'Consultando backend...'}</p>
         )}
       </section>
     </main>
-  );
+  )
 }
