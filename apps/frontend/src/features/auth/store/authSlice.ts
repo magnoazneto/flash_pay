@@ -1,4 +1,4 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
+import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import type { RootState } from '@/store'
 import type { AuthState, AuthResponse, User } from '../types'
 
@@ -118,4 +118,7 @@ export default authSlice.reducer
 export const selectCurrentUser = (state: RootState) => state.auth.user
 export const selectToken = (state: RootState) => state.auth.token
 export const selectIsAuth = (state: RootState) => state.auth.isAuthenticated
-export const selectIsAdmin = (state: RootState) => state.auth.user?.role === 'admin'
+export const selectIsAdmin = createSelector(
+  [selectCurrentUser],
+  (user) => user?.role === 'admin',
+)
