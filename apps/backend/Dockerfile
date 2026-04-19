@@ -3,6 +3,7 @@ FROM golang:1.23-alpine AS deps
 WORKDIR /app
 
 COPY go.mod go.sum* ./
+COPY third_party/google_uuid ./third_party/google_uuid
 RUN mkdir -p /root/go/pkg/mod && go mod download
 
 FROM golang:1.23-alpine AS dev
