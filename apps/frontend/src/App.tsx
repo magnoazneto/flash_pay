@@ -19,7 +19,7 @@ function GuestOnly({ children }: { children: JSX.Element }) {
   const isAuthenticated = useAppSelector(selectIsAuth)
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/dashboard" replace />
   }
 
   return children
@@ -28,8 +28,9 @@ function GuestOnly({ children }: { children: JSX.Element }) {
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route
-        path="/"
+        path="/dashboard"
         element={
           <AuthOnly>
             <HomePage />
@@ -52,7 +53,7 @@ export default function App() {
           </GuestOnly>
         }
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   )
 }

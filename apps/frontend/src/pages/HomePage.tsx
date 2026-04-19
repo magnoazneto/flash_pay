@@ -1,29 +1,10 @@
-import { useMemo } from 'react'
 import { useAppDispatch, useAppSelector } from '@/hooks/store'
-import {
-  logout,
-  selectCurrentUser,
-  selectIsAdmin,
-  selectToken,
-} from '@/features/auth/store/authSlice'
+import { logout, selectCurrentUser, selectIsAdmin } from '@/features/auth/store/authSlice'
 
 export default function HomePage() {
   const dispatch = useAppDispatch()
   const user = useAppSelector(selectCurrentUser)
-  const token = useAppSelector(selectToken)
   const isAdmin = useAppSelector(selectIsAdmin)
-
-  const tokenPreview = useMemo(() => {
-    if (!token) {
-      return 'Nao autenticado'
-    }
-
-    if (token.length <= 24) {
-      return token
-    }
-
-    return `${token.slice(0, 16)}...${token.slice(-8)}`
-  }, [token])
 
   return (
     <main className="dashboard-shell">
@@ -63,10 +44,6 @@ export default function HomePage() {
           <div>
             <dt>Acesso admin</dt>
             <dd>{isAdmin ? 'Sim' : 'Nao'}</dd>
-          </div>
-          <div>
-            <dt>Token</dt>
-            <dd className="token-preview">{tokenPreview}</dd>
           </div>
         </dl>
       </section>

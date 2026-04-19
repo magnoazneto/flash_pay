@@ -5,6 +5,7 @@ import { setCredentials } from '@/features/auth/store/authSlice'
 import { useRegisterMutation } from '@/features/auth/store/authApi'
 import {
   getAuthErrorMessage,
+  hasStatusCode,
   validateRegisterForm,
   type RegisterFormValues,
 } from '@/features/auth/utils/forms'
@@ -48,8 +49,16 @@ export default function RegisterPage() {
       }).unwrap()
 
       dispatch(setCredentials(response))
-      navigate('/', { replace: true })
+      navigate('/dashboard', { replace: true })
     } catch (error) {
+      if (hasStatusCode(error, 409)) {
+        setErrors((current) => ({
+          ...current,
+          email: 'Este email ja esta em uso.',
+        }))
+        return
+      }
+
       setSubmitError(
         getAuthErrorMessage(error, 'Nao foi possivel concluir o cadastro.'),
       )
@@ -91,7 +100,11 @@ export default function RegisterPage() {
               aria-describedby={errors.name ? 'register-name-error' : undefined}
             />
             {errors.name ? (
-              <small id="register-name-error" className="field-error">
+              <small
+                id="register-name-error"
+                className="field-error"
+                role="alert"
+              >
                 {errors.name}
               </small>
             ) : null}
@@ -110,7 +123,11 @@ export default function RegisterPage() {
               }
             />
             {errors.email ? (
-              <small id="register-email-error" className="field-error">
+              <small
+                id="register-email-error"
+                className="field-error"
+                role="alert"
+              >
                 {errors.email}
               </small>
             ) : null}
@@ -129,7 +146,11 @@ export default function RegisterPage() {
               }
             />
             {errors.password ? (
-              <small id="register-password-error" className="field-error">
+              <small
+                id="register-password-error"
+                className="field-error"
+                role="alert"
+              >
                 {errors.password}
               </small>
             ) : null}
@@ -155,13 +176,18 @@ export default function RegisterPage() {
               <small
                 id="register-confirm-password-error"
                 className="field-error"
+                role="alert"
               >
                 {errors.confirmPassword}
               </small>
             ) : null}
           </label>
 
-          {submitError ? <p className="submit-error">{submitError}</p> : null}
+          {submitError ? (
+            <p className="submit-error" role="alert">
+              {submitError}
+            </p>
+          ) : null}
 
           <button className="primary-button" type="submit" disabled={isLoading}>
             {isLoading ? 'Criando conta...' : 'Criar conta'}

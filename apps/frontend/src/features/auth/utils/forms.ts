@@ -98,9 +98,8 @@ export const getAuthErrorMessage = (
     return buildFieldError(payload.message, fallbackMessage)
   }
 
-  if (typeof error.status === 'number') {
-    return `Falha na requisicao (${error.status}).`
-  }
-
   return fallbackMessage
 }
+
+export const hasStatusCode = (error: unknown, statusCode: number): boolean =>
+  isFetchBaseQueryError(error) && error.status === statusCode

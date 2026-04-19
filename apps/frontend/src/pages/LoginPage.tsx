@@ -45,7 +45,7 @@ export default function LoginPage() {
       }).unwrap()
 
       dispatch(setCredentials(response))
-      navigate('/', { replace: true })
+      navigate('/dashboard', { replace: true })
     } catch (error) {
       setSubmitError(getAuthErrorMessage(error, 'Nao foi possivel entrar agora.'))
     }
@@ -86,7 +86,11 @@ export default function LoginPage() {
               aria-describedby={errors.email ? 'login-email-error' : undefined}
             />
             {errors.email ? (
-              <small id="login-email-error" className="field-error">
+              <small
+                id="login-email-error"
+                className="field-error"
+                role="alert"
+              >
                 {errors.email}
               </small>
             ) : null}
@@ -105,13 +109,21 @@ export default function LoginPage() {
               }
             />
             {errors.password ? (
-              <small id="login-password-error" className="field-error">
+              <small
+                id="login-password-error"
+                className="field-error"
+                role="alert"
+              >
                 {errors.password}
               </small>
             ) : null}
           </label>
 
-          {submitError ? <p className="submit-error">{submitError}</p> : null}
+          {submitError ? (
+            <p className="submit-error" role="alert">
+              {submitError}
+            </p>
+          ) : null}
 
           <button className="primary-button" type="submit" disabled={isLoading}>
             {isLoading ? 'Entrando...' : 'Entrar'}
