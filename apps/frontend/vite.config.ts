@@ -5,6 +5,9 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   cacheDir: '.vite',
+  test: {
+    environment: 'jsdom',
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

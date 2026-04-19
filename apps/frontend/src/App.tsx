@@ -1,30 +1,10 @@
-import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { useAppSelector } from '@/hooks/store'
-import { selectIsAuth } from '@/features/auth/store/authSlice'
+import GuestRoute from '@/features/auth/components/GuestRoute'
+import ProtectedRoute from '@/features/auth/components/ProtectedRoute'
+import AdminPage from '@/pages/AdminPage'
 import HomePage from '@/pages/HomePage'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
-
-function AuthOnly({ children }: { children: ReactNode }) {
-  const isAuthenticated = useAppSelector(selectIsAuth)
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
-
-  return children
-}
-
-function GuestOnly({ children }: { children: ReactNode }) {
-  const isAuthenticated = useAppSelector(selectIsAuth)
-
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />
-  }
-
-  return children
-}
 
 export default function App() {
   return (
@@ -33,25 +13,33 @@ export default function App() {
       <Route
         path="/dashboard"
         element={
-          <AuthOnly>
+          <ProtectedRoute>
             <HomePage />
-          </AuthOnly>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminPage />
+          </ProtectedRoute>
         }
       />
       <Route
         path="/login"
         element={
-          <GuestOnly>
+          <GuestRoute>
             <LoginPage />
-          </GuestOnly>
+          </GuestRoute>
         }
       />
       <Route
         path="/register"
         element={
-          <GuestOnly>
+          <GuestRoute>
             <RegisterPage />
-          </GuestOnly>
+          </GuestRoute>
         }
       />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

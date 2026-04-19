@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '@/hooks/store'
 import { logout, selectCurrentUser, selectIsAdmin } from '@/features/auth/store/authSlice'
 
@@ -46,6 +47,14 @@ export default function HomePage() {
             <dd>{isAdmin ? 'Sim' : 'Nao'}</dd>
           </div>
         </dl>
+
+        <p className="auth-footer">
+          {isAdmin ? (
+            <Link to="/admin">Abrir painel administrativo</Link>
+          ) : (
+            'Seu perfil atual nao pode acessar rotas administrativas.'
+          )}
+        </p>
       </section>
     </main>
   )
