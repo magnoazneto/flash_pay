@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import BatchUploadCard from '@/features/batches/components/BatchUploadCard'
 import { useAppDispatch, useAppSelector } from '@/hooks/store'
 import { logout, selectCurrentUser, selectIsAdmin } from '@/features/auth/store/authSlice'
 
@@ -56,6 +57,8 @@ export default function HomePage() {
           )}
         </p>
       </section>
+
+      <BatchUploadCard />
     </main>
   )
 }
