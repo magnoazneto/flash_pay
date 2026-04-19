@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAppSelector } from '@/hooks/store'
 import { selectIsAuth } from '@/features/auth/store/authSlice'
@@ -5,7 +6,7 @@ import HomePage from '@/pages/HomePage'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
 
-function AuthOnly({ children }: { children: JSX.Element }) {
+function AuthOnly({ children }: { children: ReactNode }) {
   const isAuthenticated = useAppSelector(selectIsAuth)
 
   if (!isAuthenticated) {
@@ -15,7 +16,7 @@ function AuthOnly({ children }: { children: JSX.Element }) {
   return children
 }
 
-function GuestOnly({ children }: { children: JSX.Element }) {
+function GuestOnly({ children }: { children: ReactNode }) {
   const isAuthenticated = useAppSelector(selectIsAuth)
 
   if (isAuthenticated) {

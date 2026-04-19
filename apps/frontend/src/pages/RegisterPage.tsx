@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAppDispatch } from '@/hooks/store'
+import RegisterForm from '@/features/auth/components/RegisterForm'
 import { setCredentials } from '@/features/auth/store/authSlice'
 import { useRegisterMutation } from '@/features/auth/store/authApi'
 import {
@@ -88,111 +89,14 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit} noValidate>
-          <label className="field">
-            <span>Nome</span>
-            <input
-              type="text"
-              autoComplete="name"
-              value={values.name}
-              onChange={(event) => handleChange('name', event.target.value)}
-              aria-invalid={!!errors.name}
-              aria-describedby={errors.name ? 'register-name-error' : undefined}
-            />
-            {errors.name ? (
-              <small
-                id="register-name-error"
-                className="field-error"
-                role="alert"
-              >
-                {errors.name}
-              </small>
-            ) : null}
-          </label>
-
-          <label className="field">
-            <span>Email</span>
-            <input
-              type="email"
-              autoComplete="email"
-              value={values.email}
-              onChange={(event) => handleChange('email', event.target.value)}
-              aria-invalid={!!errors.email}
-              aria-describedby={
-                errors.email ? 'register-email-error' : undefined
-              }
-            />
-            {errors.email ? (
-              <small
-                id="register-email-error"
-                className="field-error"
-                role="alert"
-              >
-                {errors.email}
-              </small>
-            ) : null}
-          </label>
-
-          <label className="field">
-            <span>Senha</span>
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={values.password}
-              onChange={(event) => handleChange('password', event.target.value)}
-              aria-invalid={!!errors.password}
-              aria-describedby={
-                errors.password ? 'register-password-error' : undefined
-              }
-            />
-            {errors.password ? (
-              <small
-                id="register-password-error"
-                className="field-error"
-                role="alert"
-              >
-                {errors.password}
-              </small>
-            ) : null}
-          </label>
-
-          <label className="field">
-            <span>Confirmar senha</span>
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={values.confirmPassword}
-              onChange={(event) =>
-                handleChange('confirmPassword', event.target.value)
-              }
-              aria-invalid={!!errors.confirmPassword}
-              aria-describedby={
-                errors.confirmPassword
-                  ? 'register-confirm-password-error'
-                  : undefined
-              }
-            />
-            {errors.confirmPassword ? (
-              <small
-                id="register-confirm-password-error"
-                className="field-error"
-                role="alert"
-              >
-                {errors.confirmPassword}
-              </small>
-            ) : null}
-          </label>
-
-          {submitError ? (
-            <p className="submit-error" role="alert">
-              {submitError}
-            </p>
-          ) : null}
-
-          <button className="primary-button" type="submit" disabled={isLoading}>
-            {isLoading ? 'Criando conta...' : 'Criar conta'}
-          </button>
-        </form>
+        <RegisterForm
+          errors={errors}
+          isLoading={isLoading}
+          submitError={submitError}
+          values={values}
+          onChange={handleChange}
+          onSubmit={handleSubmit}
+        />
 
         <p className="auth-footer">
           Ja possui conta? <Link to="/login">Fazer login</Link>

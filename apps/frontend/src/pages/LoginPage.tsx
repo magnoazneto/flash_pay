@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAppDispatch } from '@/hooks/store'
+import LoginForm from '@/features/auth/components/LoginForm'
 import { setCredentials } from '@/features/auth/store/authSlice'
 import { useLoginMutation } from '@/features/auth/store/authApi'
 import {
@@ -74,61 +75,14 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit} noValidate>
-          <label className="field">
-            <span>Email</span>
-            <input
-              type="email"
-              autoComplete="email"
-              value={values.email}
-              onChange={(event) => handleChange('email', event.target.value)}
-              aria-invalid={!!errors.email}
-              aria-describedby={errors.email ? 'login-email-error' : undefined}
-            />
-            {errors.email ? (
-              <small
-                id="login-email-error"
-                className="field-error"
-                role="alert"
-              >
-                {errors.email}
-              </small>
-            ) : null}
-          </label>
-
-          <label className="field">
-            <span>Senha</span>
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={values.password}
-              onChange={(event) => handleChange('password', event.target.value)}
-              aria-invalid={!!errors.password}
-              aria-describedby={
-                errors.password ? 'login-password-error' : undefined
-              }
-            />
-            {errors.password ? (
-              <small
-                id="login-password-error"
-                className="field-error"
-                role="alert"
-              >
-                {errors.password}
-              </small>
-            ) : null}
-          </label>
-
-          {submitError ? (
-            <p className="submit-error" role="alert">
-              {submitError}
-            </p>
-          ) : null}
-
-          <button className="primary-button" type="submit" disabled={isLoading}>
-            {isLoading ? 'Entrando...' : 'Entrar'}
-          </button>
-        </form>
+        <LoginForm
+          errors={errors}
+          isLoading={isLoading}
+          submitError={submitError}
+          values={values}
+          onChange={handleChange}
+          onSubmit={handleSubmit}
+        />
 
         <p className="auth-footer">
           Ainda nao tem conta? <Link to="/register">Criar cadastro</Link>
