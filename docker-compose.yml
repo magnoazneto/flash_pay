@@ -1,15 +1,16 @@
 services:
   frontend:
     build:
-      context: ./apps/frontend
-    working_dir: /app
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    working_dir: /app/apps/frontend
     env_file:
       - .env
     ports:
       - "5173:5173"
     volumes:
-      - ./apps/frontend:/app
-      - /app/node_modules
+      - ./apps/frontend:/app/apps/frontend
+      - /app/apps/frontend/node_modules
     networks:
       - flashpay-net
     depends_on:
