@@ -1,13 +1,19 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/flashpay/backend/internal/auth"
+	"github.com/flashpay/backend/internal/batch"
+	"github.com/flashpay/backend/internal/gateway"
+	"github.com/flashpay/backend/internal/payment"
 	"github.com/flashpay/backend/internal/user"
+	"github.com/flashpay/backend/internal/worker"
 	"github.com/flashpay/backend/pkg/config"
 	"github.com/flashpay/backend/pkg/database"
 	apimiddleware "github.com/flashpay/backend/pkg/middleware"
@@ -16,6 +22,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -36,11 +43,26 @@ func main() {
 	}
 	defer db.Close()
 
+	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("failed to open pgx pool: %v", err)
+	}
+	defer pool.Close()
+
+	if err := pool.Ping(context.Background()); err != nil {
+		log.Fatalf("failed to ping pgx pool: %v", err)
+	}
+
 	userRepository := user.NewPostgresRepository(db)
+	paymentRepository := payment.NewPostgresRepository(pool)
+	batchRepository := batch.NewPostgresRepository(pool)
+	workerPool := worker.NewPool(paymentRepository, gateway.New(gateway.DefaultConfig()), slog.Default(), 0)
 	userService := user.NewService(userRepository)
 	userHandler := user.NewHandler(userService)
 	authService := auth.NewService(userRepository, cfg.JWTSecret, cfg.JWTExpirationHours)
 	authHandler := auth.NewHandler(authService)
+	batchService := batch.NewService(batchRepository, paymentRepository, workerPool)
+	batchHandler := batch.NewHandler(batchService)
 	apimiddleware.SetJWTSecret(cfg.JWTSecret)
 
 	r := chi.NewRouter()
@@ -62,6 +84,7 @@ func main() {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claims)
 		})
+		r.With(apimiddleware.RequireRole("admin", "operator")).Post("/batches/upload", batchHandler.Upload)
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(apimiddleware.RequireRole("admin"))
 			r.Get("/users", userHandler.ListUsers)

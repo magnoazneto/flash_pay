@@ -2,10 +2,13 @@ module github.com/flashpay/backend
 
 go 1.23.0
 
+replace github.com/google/uuid => ./third_party/google_uuid
+
 require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/golang-migrate/migrate/v4 v4.18.3
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.5.4
 	github.com/prometheus/client_golang v1.20.5
 	golang.org/x/crypto v0.36.0
