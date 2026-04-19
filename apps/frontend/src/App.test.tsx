@@ -158,4 +158,53 @@ describe('App protected routes', () => {
     ).toBeTruthy()
     expect(screen.getByText('Admin User')).toBeTruthy()
   })
+
+  it('protects batch details route for authenticated users', () => {
+    renderApp({
+      initialEntry: '/batches/batch-123',
+      authState: {
+        token: 'token',
+        user: operatorUser,
+        isAuthenticated: true,
+      },
+    })
+
+    expect(
+      screen.getByRole('heading', { name: 'Detalhes do lote' }),
+    ).toBeTruthy()
+    expect(screen.getByText('batch-123')).toBeTruthy()
+  })
+
+  it('allows admins to access admin child routes', () => {
+    renderApp({
+      initialEntry: '/admin/users',
+      authState: {
+        token: 'token',
+        user: adminUser,
+        isAuthenticated: true,
+      },
+    })
+
+    expect(
+      screen.getByRole('heading', { name: 'Usuarios administrativos' }),
+    ).toBeTruthy()
+  })
+
+  it('protects admin batch route by role', () => {
+    renderApp({
+      initialEntry: '/admin/batches',
+      authState: {
+        token: 'token',
+        user: operatorUser,
+        isAuthenticated: true,
+      },
+    })
+
+    expect(
+      screen.getByRole('heading', { name: 'Painel autenticado' }),
+    ).toBeTruthy()
+    expect(
+      screen.queryByRole('heading', { name: 'Lotes administrativos' }),
+    ).toBeNull()
+  })
 })

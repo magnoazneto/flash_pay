@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAppSelector } from '@/hooks/store'
 import { selectCurrentUser, selectIsAuth } from '@/features/auth/store/authSlice'
 import type { User } from '@/features/auth/types'
@@ -15,9 +15,10 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
   const isAuthenticated = useAppSelector(selectIsAuth)
   const currentUser = useAppSelector(selectCurrentUser)
+  const location = useLocation()
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" replace state={{ from: location }} />
   }
 
   if (allowedRoles && (!currentUser || !allowedRoles.includes(currentUser.role))) {

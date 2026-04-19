@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAppDispatch } from '@/hooks/store'
 import LoginForm from '@/features/auth/components/LoginForm'
 import { setCredentials } from '@/features/auth/store/authSlice'
@@ -9,6 +9,7 @@ import {
   validateLoginForm,
   type LoginFormValues,
 } from '@/features/auth/utils/forms'
+import { resolvePostLoginRedirect } from '@/features/auth/utils/routing'
 
 const initialValues: LoginFormValues = {
   email: '',
@@ -18,6 +19,7 @@ const initialValues: LoginFormValues = {
 export default function LoginPage() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
   const [login, { isLoading }] = useLoginMutation()
   const [values, setValues] = useState<LoginFormValues>(initialValues)
   const [errors, setErrors] = useState<Partial<LoginFormValues>>({})
@@ -46,7 +48,7 @@ export default function LoginPage() {
       }).unwrap()
 
       dispatch(setCredentials(response))
-      navigate('/dashboard', { replace: true })
+      navigate(resolvePostLoginRedirect(location.state), { replace: true })
     } catch (error) {
       setSubmitError(getAuthErrorMessage(error, 'Nao foi possivel entrar agora.'))
     }
