@@ -73,7 +73,7 @@ const hydrateAuthState = (): AuthState => {
   const storedToken = localStorage.getItem(TOKEN_KEY)
   const storedUser = parseStoredUser(localStorage.getItem(USER_KEY))
 
-  if (!storedToken || isTokenExpired(storedToken)) {
+  if (!storedToken || isTokenExpired(storedToken) || !storedUser) {
     clearStoredCredentials()
 
     return {
