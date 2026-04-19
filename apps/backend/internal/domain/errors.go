@@ -8,4 +8,6 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrValidation         = errors.New("validation error")
 	ErrCannotDeleteSelf   = errors.New("cannot delete your own account")
+	ErrNotFound           = errors.New("not found")
+	ErrForbidden          = errors.New("forbidden")
 )
