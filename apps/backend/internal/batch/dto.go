@@ -1,6 +1,10 @@
 package batch
 
-import "time"
+import (
+	"time"
+
+	"github.com/shopspring/decimal"
+)
 
 type UploadResponse struct {
 	BatchID       string    `json:"batch_id"`
@@ -21,4 +25,45 @@ type ParseValidationError struct {
 
 func (e *ParseValidationError) Error() string {
 	return "csv validation failed"
+}
+
+type PaymentResponse struct {
+	ID           string          `json:"id"`
+	Recipient    string          `json:"recipient"`
+	Amount       decimal.Decimal `json:"amount"`
+	Status       string          `json:"status"`
+	ErrorMessage *string         `json:"error_message,omitempty"`
+	ProcessedAt  *time.Time      `json:"processed_at,omitempty"`
+}
+
+type StatusCountResponse struct {
+	Pending    int `json:"pending"`
+	Processing int `json:"processing"`
+	Success    int `json:"success"`
+	Failed     int `json:"failed"`
+}
+
+type BatchSummaryResponse struct {
+	ID            string              `json:"id"`
+	FileName      string              `json:"file_name"`
+	TotalPayments int                 `json:"total_payments"`
+	StatusCount   StatusCountResponse `json:"status_count"`
+	CreatedAt     time.Time           `json:"created_at"`
+}
+
+type BatchDetailResponse struct {
+	ID            string              `json:"id"`
+	FileName      string              `json:"file_name"`
+	TotalPayments int                 `json:"total_payments"`
+	UserID        string              `json:"user_id"`
+	StatusCount   StatusCountResponse `json:"status_count"`
+	Payments      []PaymentResponse   `json:"payments"`
+	CreatedAt     time.Time           `json:"created_at"`
+}
+
+type BatchListResponse struct {
+	Batches []BatchSummaryResponse `json:"batches"`
+	Total   int                    `json:"total"`
+	Limit   int                    `json:"limit"`
+	Offset  int                    `json:"offset"`
 }

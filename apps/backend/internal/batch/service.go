@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/flashpay/backend/internal/domain"
 	"github.com/flashpay/backend/internal/payment"
 	"github.com/flashpay/backend/internal/worker"
 	"github.com/google/uuid"
@@ -11,6 +12,9 @@ import (
 
 type Service interface {
 	ProcessUpload(ctx context.Context, userID, fileName string, file io.Reader) (*UploadResponse, error)
+	List(ctx context.Context, userID string, limit, offset int) (*BatchListResponse, error)
+	GetByID(ctx context.Context, batchID, requesterID, requesterRole string) (*BatchDetailResponse, error)
+	ListAll(ctx context.Context, filterUserID string, limit, offset int) (*BatchListResponse, error)
 }
 
 type service struct {
@@ -80,6 +84,137 @@ func (s *service) ProcessUpload(ctx context.Context, userID, fileName string, fi
 		Status:        "pending",
 		CreatedAt:     createdAt,
 	}, nil
+}
+
+func (s *service) List(ctx context.Context, userID string, limit, offset int) (*BatchListResponse, error) {
+	limit, offset = normalizePagination(limit, offset)
+
+	batches, total, err := s.batchRepo.FindByUserID(ctx, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := s.buildBatchSummaries(ctx, batches)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BatchListResponse{
+		Batches: items,
+		Total:   total,
+		Limit:   limit,
+		Offset:  offset,
+	}, nil
+}
+
+func (s *service) GetByID(ctx context.Context, batchID, requesterID, requesterRole string) (*BatchDetailResponse, error) {
+	batch, err := s.batchRepo.FindByID(ctx, batchID)
+	if err != nil {
+		return nil, err
+	}
+
+	if batch.UserID != requesterID && requesterRole != "admin" {
+		return nil, domain.ErrForbidden
+	}
+
+	statusCount, err := s.paymentRepo.CountByStatus(ctx, batch.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	payments, err := s.paymentRepo.FindByBatchID(ctx, batch.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BatchDetailResponse{
+		ID:            batch.ID,
+		FileName:      batch.FileName,
+		TotalPayments: batch.TotalPayments,
+		UserID:        batch.UserID,
+		StatusCount:   mapStatusCount(statusCount),
+		Payments:      mapPayments(payments),
+		CreatedAt:     batch.CreatedAt,
+	}, nil
+}
+
+func (s *service) ListAll(ctx context.Context, filterUserID string, limit, offset int) (*BatchListResponse, error) {
+	limit, offset = normalizePagination(limit, offset)
+
+	batches, total, err := s.batchRepo.FindAll(ctx, filterUserID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := s.buildBatchSummaries(ctx, batches)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BatchListResponse{
+		Batches: items,
+		Total:   total,
+		Limit:   limit,
+		Offset:  offset,
+	}, nil
+}
+
+func (s *service) buildBatchSummaries(ctx context.Context, batches []BatchRecord) ([]BatchSummaryResponse, error) {
+	items := make([]BatchSummaryResponse, 0, len(batches))
+
+	for _, batch := range batches {
+		statusCount, err := s.paymentRepo.CountByStatus(ctx, batch.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, BatchSummaryResponse{
+			ID:            batch.ID,
+			FileName:      batch.FileName,
+			TotalPayments: batch.TotalPayments,
+			StatusCount:   mapStatusCount(statusCount),
+			CreatedAt:     batch.CreatedAt,
+		})
+	}
+
+	return items, nil
+}
+
+func mapPayments(payments []payment.Payment) []PaymentResponse {
+	items := make([]PaymentResponse, 0, len(payments))
+	for _, p := range payments {
+		items = append(items, PaymentResponse{
+			ID:           p.ID,
+			Recipient:    p.Recipient,
+			Amount:       p.Amount,
+			Status:       p.Status,
+			ErrorMessage: p.ErrorMessage,
+			ProcessedAt:  p.ProcessedAt,
+		})
+	}
+	return items
+}
+
+func mapStatusCount(count payment.StatusCount) StatusCountResponse {
+	return StatusCountResponse{
+		Pending:    count.Pending,
+		Processing: count.Processing,
+		Success:    count.Success,
+		Failed:     count.Failed,
+	}
+}
+
+func normalizePagination(limit, offset int) (int, int) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return limit, offset
 }
 
 func mapParseErrors(parseErrors []payment.ParseError) []ValidationDetail {

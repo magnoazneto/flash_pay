@@ -85,6 +85,9 @@ func main() {
 			_ = json.NewEncoder(w).Encode(claims)
 		})
 		r.With(apimiddleware.RequireRole("admin", "operator")).Post("/batches/upload", batchHandler.Upload)
+		r.Get("/batches", batchHandler.List)
+		r.Get("/batches/{id}", batchHandler.GetByID)
+		r.With(apimiddleware.RequireRole("admin")).Get("/admin/batches", batchHandler.ListAll)
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(apimiddleware.RequireRole("admin"))
 			r.Get("/users", userHandler.ListUsers)
