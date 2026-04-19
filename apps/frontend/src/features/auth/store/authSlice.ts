@@ -1,24 +1,96 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
-import type { AuthState, AuthResponse } from '../types'
+import type { RootState } from '@/store'
+import type { AuthState, AuthResponse, User } from '../types'
 
 const TOKEN_KEY = 'flashpay_token'
 const USER_KEY = 'flashpay_user'
 
-const storedToken = localStorage.getItem(TOKEN_KEY)
-const storedUserRaw = localStorage.getItem(USER_KEY)
+const isValidUser = (value: unknown): value is User => {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
 
-let storedUser = null
-try {
-  storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : null
-} catch {
-  storedUser = null
+  const user = value as Record<string, unknown>
+
+  return (
+    typeof user.id === 'string' &&
+    typeof user.name === 'string' &&
+    typeof user.email === 'string' &&
+    (user.role === 'admin' || user.role === 'operator')
+  )
 }
 
-const initialState: AuthState = {
-  token: storedToken,
-  user: storedUser,
-  isAuthenticated: !!storedToken,
+const parseStoredUser = (storedUserRaw: string | null): User | null => {
+  if (!storedUserRaw) {
+    return null
+  }
+
+  try {
+    const parsedUser: unknown = JSON.parse(storedUserRaw)
+    return isValidUser(parsedUser) ? parsedUser : null
+  } catch {
+    return null
+  }
 }
+
+const parseJwtExp = (token: string): number | null => {
+  const [, payload] = token.split('.')
+
+  if (!payload) {
+    return null
+  }
+
+  try {
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+      '=',
+    )
+    const decodedPayload = JSON.parse(atob(paddedPayload)) as { exp?: unknown }
+
+    return typeof decodedPayload.exp === 'number' ? decodedPayload.exp : null
+  } catch {
+    return null
+  }
+}
+
+const isTokenExpired = (token: string): boolean => {
+  const exp = parseJwtExp(token)
+
+  if (exp === null) {
+    return true
+  }
+
+  return exp <= Math.floor(Date.now() / 1000)
+}
+
+const clearStoredCredentials = () => {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+}
+
+const hydrateAuthState = (): AuthState => {
+  const storedToken = localStorage.getItem(TOKEN_KEY)
+  const storedUser = parseStoredUser(localStorage.getItem(USER_KEY))
+
+  if (!storedToken || isTokenExpired(storedToken)) {
+    clearStoredCredentials()
+
+    return {
+      token: null,
+      user: null,
+      isAuthenticated: false,
+    }
+  }
+
+  return {
+    token: storedToken,
+    user: storedUser,
+    isAuthenticated: true,
+  }
+}
+
+const initialState: AuthState = hydrateAuthState()
 
 const authSlice = createSlice({
   name: 'auth',
@@ -35,8 +107,7 @@ const authSlice = createSlice({
       state.token = null
       state.user = null
       state.isAuthenticated = false
-      localStorage.removeItem(TOKEN_KEY)
-      localStorage.removeItem(USER_KEY)
+      clearStoredCredentials()
     },
   },
 })
@@ -44,7 +115,7 @@ const authSlice = createSlice({
 export const { setCredentials, logout } = authSlice.actions
 export default authSlice.reducer
 
-export const selectCurrentUser = (state: { auth: AuthState }) => state.auth.user
-export const selectToken = (state: { auth: AuthState }) => state.auth.token
-export const selectIsAuth = (state: { auth: AuthState }) => state.auth.isAuthenticated
-export const selectIsAdmin = (state: { auth: AuthState }) => state.auth.user?.role === 'admin'
+export const selectCurrentUser = (state: RootState) => state.auth.user
+export const selectToken = (state: RootState) => state.auth.token
+export const selectIsAuth = (state: RootState) => state.auth.isAuthenticated
+export const selectIsAdmin = (state: RootState) => state.auth.user?.role === 'admin'
