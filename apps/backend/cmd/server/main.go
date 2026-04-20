@@ -56,12 +56,13 @@ func main() {
 	userRepository := user.NewPostgresRepository(db)
 	paymentRepository := payment.NewPostgresRepository(pool)
 	batchRepository := batch.NewPostgresRepository(pool)
-	workerPool := worker.NewPool(paymentRepository, gateway.New(gateway.DefaultConfig()), slog.Default(), 0)
+	streamBroker := batch.NewStreamBroker()
+	workerPool := worker.NewPool(paymentRepository, gateway.New(gateway.DefaultConfig()), streamBroker, slog.Default(), 0)
 	userService := user.NewService(userRepository)
 	userHandler := user.NewHandler(userService)
 	authService := auth.NewService(userRepository, cfg.JWTSecret, cfg.JWTExpirationHours)
 	authHandler := auth.NewHandler(authService)
-	batchService := batch.NewService(batchRepository, paymentRepository, workerPool)
+	batchService := batch.NewService(batchRepository, paymentRepository, workerPool, streamBroker)
 	batchHandler := batch.NewHandler(batchService)
 	apimiddleware.SetJWTSecret(cfg.JWTSecret)
 
@@ -87,6 +88,7 @@ func main() {
 		r.With(apimiddleware.RequireRole("admin", "operator")).Post("/batches/upload", batchHandler.Upload)
 		r.Get("/batches", batchHandler.List)
 		r.Get("/batches/{id}", batchHandler.GetByID)
+		r.Get("/batches/{id}/stream", batchHandler.Stream)
 		r.With(apimiddleware.RequireRole("admin")).Get("/admin/batches", batchHandler.ListAll)
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(apimiddleware.RequireRole("admin"))

@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import BatchUploadCard from '@/features/batches/components/BatchUploadCard'
+import BatchHistoryCard from '@/features/batches/components/BatchHistoryCard'
+import { useGetBatchesQuery } from '@/features/batches/store/batchApi'
 import { useAppDispatch, useAppSelector } from '@/hooks/store'
 import { logout, selectCurrentUser, selectIsAdmin } from '@/features/auth/store/authSlice'
 
@@ -7,6 +9,18 @@ export default function HomePage() {
   const dispatch = useAppDispatch()
   const user = useAppSelector(selectCurrentUser)
   const isAdmin = useAppSelector(selectIsAdmin)
+  const {
+    data: batchesData,
+    isLoading: isBatchesLoading,
+    isFetching: isBatchesFetching,
+    error: batchesError,
+  } = useGetBatchesQuery(
+    { limit: 10, offset: 0 },
+    {
+      refetchOnMountOrArgChange: 30,
+      pollingInterval: 15000,
+    },
+  )
 
   return (
     <main className="dashboard-shell">
@@ -59,6 +73,17 @@ export default function HomePage() {
       </section>
 
       <BatchUploadCard />
+
+      <BatchHistoryCard
+        batches={batchesData?.batches ?? []}
+        isLoading={isBatchesLoading}
+        isFetching={isBatchesFetching}
+        errorMessage={
+          batchesError
+            ? 'Nao foi possivel carregar o historico de lotes.'
+            : null
+        }
+      />
     </main>
   )
 }

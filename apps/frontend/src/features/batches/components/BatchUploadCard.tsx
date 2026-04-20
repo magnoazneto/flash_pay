@@ -1,6 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useUploadBatchMutation } from '@/features/batches/store/batchApi'
 import { isCsvFile, parseCsvPreview } from '@/features/batches/utils/csv'
-import type { CsvPreviewData } from '@/features/batches/types'
+import type { BatchApiErrorResponse, CsvPreviewData } from '@/features/batches/types'
+import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
 
 const readFileContent = async (file: File) => {
   if (typeof file.text === 'function') {
@@ -17,16 +20,54 @@ const readFileContent = async (file: File) => {
 }
 
 export default function BatchUploadCard() {
+  const navigate = useNavigate()
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<CsvPreviewData | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [uploadBatch, { error: uploadError, isLoading, reset }] = useUploadBatchMutation()
+
+  const getUploadErrorMessage = (error: unknown) => {
+    const fallbackMessage = 'Nao foi possivel enviar o lote.'
+
+    if (!error || typeof error !== 'object' || !('status' in error)) {
+      return fallbackMessage
+    }
+
+    const fetchError = error as FetchBaseQueryError
+
+    if ('error' in fetchError && typeof fetchError.error === 'string') {
+      return fetchError.error
+    }
+
+    if (!fetchError.data || typeof fetchError.data !== 'object') {
+      return fallbackMessage
+    }
+
+    const apiError = fetchError.data as BatchApiErrorResponse
+
+    if (typeof apiError.error === 'string' && apiError.error.length > 0) {
+      return apiError.error
+    }
+
+    if (Array.isArray(apiError.errors) && apiError.errors.length > 0) {
+      const [firstError] = apiError.errors
+
+      return `Linha ${firstError.line} (${firstError.column}): ${firstError.message}`
+    }
+
+    return fallbackMessage
+  }
 
   const handleFile = async (file: File) => {
+    reset()
+
     if (!isCsvFile(file)) {
       setSelectedFileName(null)
+      setSelectedFile(null)
       setPreview(null)
-      setError('Selecione um arquivo com extensao .csv.')
+      setValidationError('Selecione um arquivo com extensao .csv.')
       return
     }
 
@@ -35,15 +76,32 @@ export default function BatchUploadCard() {
 
     if (!nextPreview) {
       setSelectedFileName(null)
+      setSelectedFile(null)
       setPreview(null)
-      setError('O CSV precisa ter cabecalho e pelo menos uma linha de pagamento.')
+      setValidationError('O CSV precisa ter cabecalho e pelo menos uma linha de pagamento.')
       return
     }
 
     setSelectedFileName(file.name)
+    setSelectedFile(file)
     setPreview(nextPreview)
-    setError(null)
+    setValidationError(null)
   }
+
+  const handleSubmit = async () => {
+    if (!selectedFile) {
+      return
+    }
+
+    try {
+      const response = await uploadBatch(selectedFile).unwrap()
+      navigate(`/batches/${response.batch_id}`)
+    } catch {
+      // Error state is rendered from RTK Query.
+    }
+  }
+
+  const errorMessage = validationError ?? (uploadError ? getUploadErrorMessage(uploadError) : null)
 
   return (
     <section className="status-card">
@@ -66,6 +124,10 @@ export default function BatchUploadCard() {
           event.preventDefault()
           setIsDragging(false)
 
+          if (isLoading) {
+            return
+          }
+
           const droppedFile = event.dataTransfer.files[0]
           if (droppedFile) {
             await handleFile(droppedFile)
@@ -77,6 +139,7 @@ export default function BatchUploadCard() {
           type="file"
           aria-label="Selecionar arquivo CSV"
           accept=".csv,text/csv"
+          disabled={isLoading}
           onChange={async (event) => {
             const nextFile = event.target.files?.[0]
             if (nextFile) {
@@ -90,9 +153,9 @@ export default function BatchUploadCard() {
         </span>
       </label>
 
-      {error ? (
+      {errorMessage ? (
         <p className="submit-error" role="alert">
-          {error}
+          {errorMessage}
         </p>
       ) : null}
 
@@ -128,8 +191,15 @@ export default function BatchUploadCard() {
         </div>
       ) : null}
 
-      <button className="primary-button" type="button" disabled={!preview}>
-        Enviar Lote
+      <button
+        className="primary-button"
+        type="button"
+        disabled={!preview || !selectedFile || isLoading}
+        onClick={() => {
+          void handleSubmit()
+        }}
+      >
+        {isLoading ? 'Enviando lote...' : 'Enviar Lote'}
       </button>
     </section>
   )

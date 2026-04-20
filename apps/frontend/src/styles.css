@@ -26,7 +26,7 @@ body {
 .dashboard-shell {
   display: grid;
   gap: 1.5rem;
-  align-items: center;
+  align-items: stretch;
   max-width: 1120px;
   margin: 0 auto;
   padding: 4rem 1.5rem;
@@ -149,6 +149,27 @@ h1 {
 }
 
 .field input:focus {
+  outline: none;
+  border-color: #0f766e;
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.14);
+  transform: translateY(-1px);
+}
+
+.field select {
+  width: 100%;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 0.95rem 1rem;
+  font: inherit;
+  color: inherit;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.field select:focus {
   outline: none;
   border-color: #0f766e;
   box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.14);
@@ -281,6 +302,331 @@ h1 {
   background: rgba(15, 23, 42, 0.04);
 }
 
+.batch-progress-card {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.batch-stream-summary {
+  text-align: right;
+}
+
+.batch-stream-meta,
+.batch-progress-meta {
+  margin: 0.3rem 0 0;
+  color: #475569;
+  font-size: 0.92rem;
+}
+
+.stream-pill,
+.payment-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.8rem;
+  padding: 0.15rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.stream-pill--idle,
+.stream-pill--disconnected {
+  background: rgba(100, 116, 139, 0.12);
+  color: #334155;
+}
+
+.stream-pill--connecting,
+.stream-pill--reconnecting {
+  background: rgba(234, 179, 8, 0.14);
+  color: #92400e;
+}
+
+.stream-pill--connected {
+  background: rgba(20, 184, 166, 0.14);
+  color: #0f766e;
+}
+
+.stream-pill--completed {
+  background: rgba(34, 197, 94, 0.14);
+  color: #166534;
+}
+
+.stream-pill--error {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+}
+
+.batch-progress-panel {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.1rem 1.15rem;
+  border-radius: 18px;
+  background: rgba(15, 118, 110, 0.05);
+  border: 1px solid rgba(15, 118, 110, 0.1);
+}
+
+.batch-progress-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.batch-progress-header h3 {
+  margin: 0.2rem 0 0;
+  font-size: 1.25rem;
+}
+
+.batch-progress-meter {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.batch-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0f766e 0%, #14b8a6 100%);
+  transition: width 0.25s ease;
+}
+
+.batch-counter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.9rem;
+  margin: 0;
+}
+
+.batch-counter-card {
+  display: grid;
+  gap: 0.2rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.batch-counter-card dt {
+  margin-bottom: 0;
+}
+
+.batch-counter-card dd {
+  font-size: 1.35rem;
+}
+
+.batch-payment-table .payment-row--failed {
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.batch-payment-table th,
+.batch-payment-table td {
+  white-space: normal;
+  vertical-align: top;
+}
+
+.payment-row--failed td {
+  color: #991b1b;
+}
+
+.payment-error-cell {
+  font-weight: 700;
+}
+
+.payment-error-details {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.payment-error-details summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #991b1b;
+}
+
+.payment-error-details p {
+  margin: 0;
+  color: #7f1d1d;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.batch-detail-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  background: rgba(15, 118, 110, 0.06);
+  border: 1px solid rgba(15, 118, 110, 0.1);
+}
+
+.batch-detail-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.batch-detail-filter input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #0f766e;
+}
+
+.batch-payment-empty {
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px dashed rgba(15, 23, 42, 0.12);
+}
+
+.payment-status-badge--pending {
+  background: rgba(100, 116, 139, 0.12);
+  color: #334155;
+}
+
+.payment-status-badge--processing {
+  background: rgba(234, 179, 8, 0.14);
+  color: #92400e;
+}
+
+.payment-status-badge--success {
+  background: rgba(34, 197, 94, 0.14);
+  color: #166534;
+}
+
+.payment-status-badge--failed {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+}
+
+.batch-history-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.batch-history-refresh {
+  margin: 0;
+  color: #0f766e;
+  font-weight: 700;
+}
+
+.batch-history-empty {
+  margin-bottom: 0;
+}
+
+.batch-history-list {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.batch-history-item {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 1.05rem;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.batch-history-item:hover,
+.batch-history-item:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(15, 118, 110, 0.25);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  outline: none;
+}
+
+.batch-history-main {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.batch-history-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.batch-history-title-row h3 {
+  margin: 0;
+  font-size: 1.02rem;
+}
+
+.batch-history-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.8rem;
+  padding: 0.15rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.08);
+  color: #0f766e;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.batch-history-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.batch-history-meta-grid dt {
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+}
+
+.batch-history-meta-grid dd {
+  font-size: 0.95rem;
+  word-break: break-word;
+}
+
+.batch-history-progress {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.batch-history-progress p {
+  margin: 0;
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.batch-history-meter {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.batch-history-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0f766e 0%, #14b8a6 100%);
+  transition: width 0.25s ease;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -298,6 +644,325 @@ h1 {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1rem;
   margin: 1.5rem 0 0;
+}
+
+.admin-users-shell {
+  align-items: start;
+}
+
+.admin-batches-shell {
+  align-items: start;
+}
+
+.admin-batch-detail-shell {
+  align-items: start;
+}
+
+.admin-users-summary {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1.5rem;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  background: rgba(15, 118, 110, 0.06);
+  border: 1px solid rgba(15, 118, 110, 0.1);
+}
+
+.admin-batches-summary {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1.5rem;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  background: rgba(15, 118, 110, 0.06);
+  border: 1px solid rgba(15, 118, 110, 0.1);
+}
+
+.admin-batches-summary-value {
+  margin: 0;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.admin-batches-summary-note {
+  margin: 0;
+  color: #475569;
+}
+
+.admin-batch-detail-header {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1.5rem;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  background: rgba(15, 118, 110, 0.06);
+  border: 1px solid rgba(15, 118, 110, 0.1);
+}
+
+.admin-batch-detail-note {
+  margin: 0;
+  color: #475569;
+}
+
+.admin-batch-detail-header a {
+  color: #0f766e;
+  font-weight: 700;
+}
+
+.admin-users-summary-value {
+  margin: 0;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.admin-users-summary-note {
+  margin: 0;
+  color: #475569;
+}
+
+.admin-users-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  text-align: right;
+}
+
+.admin-users-links a,
+.admin-users-feedback {
+  color: #0f766e;
+  font-weight: 700;
+}
+
+.admin-users-feedback {
+  margin-bottom: 0;
+}
+
+.admin-users-feedback--success {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: rgba(20, 184, 166, 0.08);
+  border: 1px solid rgba(20, 184, 166, 0.14);
+}
+
+.admin-users-card {
+  gap: 1rem;
+}
+
+.admin-batches-card {
+  gap: 1rem;
+}
+
+.admin-batches-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.admin-batches-filter span {
+  font-size: 0.9rem;
+}
+
+.admin-batches-overview {
+  margin: 0;
+  color: #475569;
+  font-weight: 700;
+}
+
+.admin-users-table-wrapper {
+  overflow-x: auto;
+}
+
+.admin-batches-table-wrapper {
+  overflow-x: auto;
+}
+
+.admin-users-table {
+  min-width: 920px;
+}
+
+.admin-batches-table {
+  min-width: 980px;
+}
+
+.admin-users-table th,
+.admin-users-table td {
+  white-space: normal;
+  vertical-align: top;
+}
+
+.admin-batches-table th,
+.admin-batches-table td {
+  white-space: normal;
+  vertical-align: top;
+}
+
+.admin-users-name-cell {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.admin-batches-group-row th {
+  padding-top: 1rem;
+  padding-bottom: 0.7rem;
+  background: rgba(15, 118, 110, 0.04);
+}
+
+.admin-batches-group-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  text-align: left;
+}
+
+.admin-batches-group-label {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.admin-batches-group-meta,
+.admin-batches-group-count {
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.admin-batches-user-cell,
+.admin-batches-file-cell {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.admin-batches-user-cell span,
+.admin-batches-row-meta {
+  color: #475569;
+  font-size: 0.86rem;
+  word-break: break-word;
+}
+
+.admin-batches-file-link {
+  color: #0f172a;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.admin-batches-file-link:hover,
+.admin-batches-file-link:focus-visible {
+  color: #0f766e;
+  outline: none;
+}
+
+.admin-batches-row-meta {
+  line-height: 1.5;
+}
+
+.admin-users-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 1.8rem;
+  padding: 0.15rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.08);
+  color: #0f766e;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.admin-users-role-select {
+  width: 100%;
+  max-width: 160px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 0.65rem 0.8rem;
+  font: inherit;
+  color: inherit;
+}
+
+.admin-users-role-select:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.admin-users-actions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.admin-users-delete-button {
+  padding-inline: 1rem;
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+}
+
+.admin-users-delete-button:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.admin-users-row-status {
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.admin-users-row--self {
+  background: rgba(15, 118, 110, 0.03);
+}
+
+.admin-users-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(8px);
+  z-index: 20;
+}
+
+.admin-users-modal {
+  width: min(100%, 560px);
+  display: grid;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 32px 100px rgba(15, 23, 42, 0.24);
+}
+
+.admin-users-modal h2 {
+  margin: 0;
+  font-size: 1.55rem;
+  line-height: 1.1;
+}
+
+.admin-users-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.admin-batches-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.admin-batches-pagination-label {
+  margin: 0;
+  color: #475569;
+  font-weight: 700;
+}
+
+.admin-users-confirm-button {
+  min-width: 160px;
 }
 
 dt {
@@ -333,6 +998,28 @@ dd {
 
   .card-header {
     flex-direction: column;
+  }
+
+  .batch-progress-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .batch-history-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-batches-pagination {
+    justify-content: flex-start;
+  }
+
+  .batch-stream-summary {
+    text-align: left;
+  }
+
+  .batch-counter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

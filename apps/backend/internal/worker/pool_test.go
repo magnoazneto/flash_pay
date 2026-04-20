@@ -18,6 +18,60 @@ type mockPaymentState struct {
 	processedAt  bool
 }
 
+type broadcastEvent struct {
+	kind              string
+	batchID           string
+	paymentID         string
+	status            string
+	errorMessage      *string
+	totalPayments     int
+	completedPayments int
+}
+
+type mockBroadcaster struct {
+	mu     sync.Mutex
+	events []broadcastEvent
+}
+
+func (m *mockBroadcaster) PublishPaymentStatus(batchID, paymentID, status string, errorMessage *string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	event := broadcastEvent{
+		kind:      "payment",
+		batchID:   batchID,
+		paymentID: paymentID,
+		status:    status,
+	}
+	if errorMessage != nil {
+		cloned := *errorMessage
+		event.errorMessage = &cloned
+	}
+
+	m.events = append(m.events, event)
+}
+
+func (m *mockBroadcaster) PublishBatchDone(batchID string, totalPayments, completedPayments int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.events = append(m.events, broadcastEvent{
+		kind:              "batch_done",
+		batchID:           batchID,
+		totalPayments:     totalPayments,
+		completedPayments: completedPayments,
+	})
+}
+
+func (m *mockBroadcaster) snapshot() []broadcastEvent {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	cloned := make([]broadcastEvent, len(m.events))
+	copy(cloned, m.events)
+	return cloned
+}
+
 type mockRepository struct {
 	mu                 sync.Mutex
 	payments           map[string]mockPaymentState
@@ -132,7 +186,7 @@ func TestPool_AllSuccess(t *testing.T) {
 
 	paymentIDs := []string{"payment-1", "payment-2", "payment-3", "payment-4", "payment-5"}
 	repo := newMockRepository(paymentIDs)
-	pool := NewPool(repo, gateway.MockGateway{ShouldFail: false}, newTestLogger(), 3)
+	pool := NewPool(repo, gateway.MockGateway{ShouldFail: false}, nil, newTestLogger(), 3)
 
 	pool.Dispatch("batch-success", paymentIDs)
 
@@ -158,6 +212,7 @@ func TestPool_AllFail(t *testing.T) {
 	pool := NewPool(
 		repo,
 		gateway.MockGateway{ShouldFail: true, ErrorMessage: "gateway error"},
+		nil,
 		newTestLogger(),
 		3,
 	)
@@ -186,7 +241,7 @@ func TestPool_MixedResults(t *testing.T) {
 
 	paymentIDs := []string{"payment-1", "payment-2", "payment-3", "payment-4", "payment-5"}
 	repo := newMockRepository(paymentIDs)
-	pool := NewPool(repo, alternatingGateway{}, newTestLogger(), 2)
+	pool := NewPool(repo, alternatingGateway{}, nil, newTestLogger(), 2)
 
 	pool.Dispatch("batch-mixed", paymentIDs)
 
@@ -223,7 +278,7 @@ func TestPool_DispatchReturnsAfterAllProcessed(t *testing.T) {
 	paymentIDs := []string{"payment-1", "payment-2", "payment-3", "payment-4", "payment-5"}
 	repo := newMockRepository(paymentIDs)
 	gatewayClient := &countingGateway{delay: 25 * time.Millisecond}
-	pool := NewPool(repo, gatewayClient, newTestLogger(), 1)
+	pool := NewPool(repo, gatewayClient, nil, newTestLogger(), 1)
 
 	start := time.Now()
 	pool.Dispatch("batch-sync", paymentIDs)
@@ -242,7 +297,7 @@ func TestPool_NoPendingAfterDispatch(t *testing.T) {
 
 	paymentIDs := []string{"payment-1", "payment-2", "payment-3", "payment-4", "payment-5"}
 	repo := newMockRepository(paymentIDs)
-	pool := NewPool(repo, gateway.MockGateway{ShouldFail: false, Delay: 10 * time.Millisecond}, newTestLogger(), 4)
+	pool := NewPool(repo, gateway.MockGateway{ShouldFail: false, Delay: 10 * time.Millisecond}, nil, newTestLogger(), 4)
 
 	pool.Dispatch("batch-no-pending", paymentIDs)
 
@@ -253,5 +308,48 @@ func TestPool_NoPendingAfterDispatch(t *testing.T) {
 		if state.status == "pending" {
 			t.Fatalf("payment %s remained in pending after dispatch", paymentID)
 		}
+	}
+}
+
+func TestPool_BroadcastsStatusUpdatesAndBatchDone(t *testing.T) {
+	t.Parallel()
+
+	paymentIDs := []string{"payment-1", "payment-2"}
+	repo := newMockRepository(paymentIDs)
+	broadcaster := &mockBroadcaster{}
+	pool := NewPool(repo, alternatingGateway{}, broadcaster, newTestLogger(), 1)
+
+	pool.Dispatch("batch-stream", paymentIDs)
+
+	events := broadcaster.snapshot()
+	if len(events) != 5 {
+		t.Fatalf("broadcast event count = %d, want 5", len(events))
+	}
+
+	wantKinds := []string{"payment", "payment", "payment", "payment", "batch_done"}
+	for index, event := range events {
+		if event.kind != wantKinds[index] {
+			t.Fatalf("event %d kind = %s, want %s", index, event.kind, wantKinds[index])
+		}
+		if event.batchID != "batch-stream" {
+			t.Fatalf("event %d batch_id = %s, want batch-stream", index, event.batchID)
+		}
+	}
+
+	if events[0].status != "processing" || events[1].status != "success" {
+		t.Fatalf("first payment events = [%s, %s], want [processing, success]", events[0].status, events[1].status)
+	}
+
+	if events[2].status != "processing" || events[3].status != "failed" {
+		t.Fatalf("second payment events = [%s, %s], want [processing, failed]", events[2].status, events[3].status)
+	}
+
+	if events[3].errorMessage == nil || *events[3].errorMessage != "gateway error" {
+		t.Fatalf("failed payment error message = %v, want gateway error", events[3].errorMessage)
+	}
+
+	doneEvent := events[4]
+	if doneEvent.totalPayments != len(paymentIDs) || doneEvent.completedPayments != len(paymentIDs) {
+		t.Fatalf("batch_done totals = (%d, %d), want (%d, %d)", doneEvent.totalPayments, doneEvent.completedPayments, len(paymentIDs), len(paymentIDs))
 	}
 }

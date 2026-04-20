@@ -15,19 +15,26 @@ type Service interface {
 	List(ctx context.Context, userID string, limit, offset int) (*BatchListResponse, error)
 	GetByID(ctx context.Context, batchID, requesterID, requesterRole string) (*BatchDetailResponse, error)
 	ListAll(ctx context.Context, filterUserID string, limit, offset int) (*BatchListResponse, error)
+	Stream(ctx context.Context, batchID, requesterID, requesterRole string) (*Subscription, error)
 }
 
 type service struct {
 	batchRepo   BatchRepository
 	paymentRepo payment.Repository
 	workerPool  *worker.Pool
+	streams     StreamSource
 }
 
-func NewService(batchRepo BatchRepository, paymentRepo payment.Repository, workerPool *worker.Pool) Service {
+func NewService(batchRepo BatchRepository, paymentRepo payment.Repository, workerPool *worker.Pool, streams StreamSource) Service {
+	if streams == nil {
+		streams = NewStreamBroker()
+	}
+
 	return &service{
 		batchRepo:   batchRepo,
 		paymentRepo: paymentRepo,
 		workerPool:  workerPool,
+		streams:     streams,
 	}
 }
 
@@ -108,13 +115,9 @@ func (s *service) List(ctx context.Context, userID string, limit, offset int) (*
 }
 
 func (s *service) GetByID(ctx context.Context, batchID, requesterID, requesterRole string) (*BatchDetailResponse, error) {
-	batch, err := s.batchRepo.FindByID(ctx, batchID)
+	batch, err := s.authorizeBatchAccess(ctx, batchID, requesterID, requesterRole)
 	if err != nil {
 		return nil, err
-	}
-
-	if batch.UserID != requesterID && requesterRole != "admin" {
-		return nil, domain.ErrForbidden
 	}
 
 	statusCount, err := s.paymentRepo.CountByStatus(ctx, batch.ID)
@@ -157,6 +160,29 @@ func (s *service) ListAll(ctx context.Context, filterUserID string, limit, offse
 		Limit:   limit,
 		Offset:  offset,
 	}, nil
+}
+
+func (s *service) Stream(ctx context.Context, batchID, requesterID, requesterRole string) (*Subscription, error) {
+	batch, err := s.authorizeBatchAccess(ctx, batchID, requesterID, requesterRole)
+	if err != nil {
+		return nil, err
+	}
+
+	subscription := s.streams.Subscribe(batch.ID)
+
+	statusCount, err := s.paymentRepo.CountByStatus(ctx, batch.ID)
+	if err != nil {
+		subscription.Close()
+		return nil, err
+	}
+
+	done, completedPayments := batchProcessingComplete(statusCount, batch.TotalPayments)
+	if done {
+		subscription.Close()
+		return NewSingleEventSubscription(NewBatchDoneEvent(batch.ID, batch.TotalPayments, completedPayments)), nil
+	}
+
+	return subscription, nil
 }
 
 func (s *service) buildBatchSummaries(ctx context.Context, batches []BatchRecord) ([]BatchSummaryResponse, error) {
@@ -215,6 +241,28 @@ func normalizePagination(limit, offset int) (int, int) {
 		offset = 0
 	}
 	return limit, offset
+}
+
+func (s *service) authorizeBatchAccess(ctx context.Context, batchID, requesterID, requesterRole string) (BatchRecord, error) {
+	batch, err := s.batchRepo.FindByID(ctx, batchID)
+	if err != nil {
+		return BatchRecord{}, err
+	}
+
+	if batch.UserID != requesterID && requesterRole != "admin" {
+		return BatchRecord{}, domain.ErrForbidden
+	}
+
+	return batch, nil
+}
+
+func batchProcessingComplete(statusCount payment.StatusCount, totalPayments int) (bool, int) {
+	completedPayments := statusCount.Success + statusCount.Failed
+	if totalPayments <= 0 {
+		return true, completedPayments
+	}
+
+	return completedPayments >= totalPayments, completedPayments
 }
 
 func mapParseErrors(parseErrors []payment.ParseError) []ValidationDetail {

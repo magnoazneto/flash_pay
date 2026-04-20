@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { configureStore } from '@reduxjs/toolkit'
+import batchDetailsReducer from '@/features/batches/store/batchDetailsSlice'
 import { baseApi } from '@/store/baseApi'
 import authReducer, { selectIsAdmin } from './authSlice'
 import type { AuthState, User } from '../types'
@@ -27,6 +28,7 @@ const createTestStore = (authState: AuthState) =>
     reducer: {
       [baseApi.reducerPath]: baseApi.reducer,
       auth: authReducer,
+      batchDetails: batchDetailsReducer,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware().concat(baseApi.middleware),

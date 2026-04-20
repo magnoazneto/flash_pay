@@ -3,6 +3,7 @@ import GuestRoute from '@/features/auth/components/GuestRoute'
 import ProtectedRoute from '@/features/auth/components/ProtectedRoute'
 import AdminPage from '@/pages/AdminPage'
 import AdminBatchesPage from '@/pages/AdminBatchesPage'
+import AdminBatchDetailsPage from '@/pages/AdminBatchDetailsPage'
 import AdminUsersPage from '@/pages/AdminUsersPage'
 import BatchDetailsPage from '@/pages/BatchDetailsPage'
 import HomePage from '@/pages/HomePage'
@@ -50,6 +51,14 @@ export default function App() {
         element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AdminBatchesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/batches/:id"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminBatchDetailsPage />
           </ProtectedRoute>
         }
       />

@@ -1,8 +1,8 @@
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
+import BatchProgressCard from '@/features/batches/components/BatchProgressCard'
 import { useBatchStream } from '@/features/batches/hooks/useBatchStream'
 import { useGetBatchByIdQuery } from '@/features/batches/store/batchApi'
-import BatchProgressCard from '@/features/batches/components/BatchProgressCard'
 import {
   type BatchProgressState,
   type BatchStreamState,
@@ -34,7 +34,7 @@ const getBatchErrorMessage = (error: unknown) => {
   return apiError.error ?? fallbackMessage
 }
 
-export default function BatchDetailsPage() {
+export default function AdminBatchDetailsPage() {
   const { id } = useParams()
   const batchId = id ?? ''
   const { data, error, isLoading } = useGetBatchByIdQuery(batchId, {
@@ -69,14 +69,21 @@ export default function BatchDetailsPage() {
   const errorMessage = error ? getBatchErrorMessage(error) : null
 
   return (
-    <main className="dashboard-shell">
+    <main className="dashboard-shell admin-batch-detail-shell">
       <section className="hero-panel">
-        <p className="eyebrow">Batches</p>
-        <h1>Detalhes do lote</h1>
+        <p className="eyebrow">Administracao</p>
+        <h1>Detalhes administrativos do lote</h1>
         <p className="lead">
-          Estado inicial do lote hidratado via API e atualizado em tempo real
-          por SSE autenticado.
+          Veja o lote existente, filtre rapidamente os pagamentos com erro e
+          exporte a lista em CSV sem sair da tela.
         </p>
+
+        <div className="admin-batch-detail-header">
+          <p className="admin-batch-detail-note">
+            Volte para a lista administrativa quando quiser revisar outro lote.
+          </p>
+          <Link to="/admin/batches">Voltar para lotes administrativos</Link>
+        </div>
       </section>
 
       <BatchProgressCard
@@ -86,6 +93,7 @@ export default function BatchDetailsPage() {
         streamState={streamState}
         isLoading={isLoading}
         errorMessage={errorMessage}
+        adminView
       />
     </main>
   )

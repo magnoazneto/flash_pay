@@ -3,9 +3,11 @@ package batch
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/flashpay/backend/internal/domain"
 	"github.com/go-chi/chi/v5"
@@ -113,6 +115,65 @@ func (h Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, response)
 }
 
+func (h Handler) Stream(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		respondError(w, http.StatusInternalServerError, "streaming unsupported")
+		return
+	}
+
+	batchID := chi.URLParam(r, "id")
+	userID := apimiddleware.GetUserID(r.Context())
+	role := apimiddleware.GetUserRole(r.Context())
+
+	subscription, err := h.service.Stream(r.Context(), batchID, userID, role)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrForbidden):
+			respondError(w, http.StatusForbidden, "forbidden")
+			return
+		case errors.Is(err, domain.ErrNotFound):
+			respondError(w, http.StatusNotFound, "batch not found")
+			return
+		default:
+			respondError(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+	}
+	defer subscription.Close()
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	keepAlive := time.NewTicker(15 * time.Second)
+	defer keepAlive.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-keepAlive.C:
+			if _, err := w.Write([]byte(": keep-alive\n\n")); err != nil {
+				return
+			}
+			flusher.Flush()
+		case event, ok := <-subscription.Events():
+			if !ok {
+				return
+			}
+
+			if err := writeSSEEvent(w, event); err != nil {
+				return
+			}
+			flusher.Flush()
+		}
+	}
+}
+
 func (h Handler) ListAll(w http.ResponseWriter, r *http.Request) {
 	limit, err := parseQueryInt(r, "limit", 20)
 	if err != nil {
@@ -163,4 +224,14 @@ func respondJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeSSEEvent(w http.ResponseWriter, event StreamEvent) error {
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event.Type, payload)
+	return err
 }
