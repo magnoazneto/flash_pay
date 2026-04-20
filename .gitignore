@@ -17,4 +17,6 @@ apps/backend/tmp/
 
 postgres-data/
 
-scripts/
+scripts/*
+!scripts/load/
+!scripts/load/**

@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev:frontend": "npm --workspace @flashpay/frontend run dev",
-    "build:frontend": "npm --workspace @flashpay/frontend run build"
+    "build:frontend": "npm --workspace @flashpay/frontend run build",
+    "load:test": "node ./scripts/load/run.mjs"
   }
 }
