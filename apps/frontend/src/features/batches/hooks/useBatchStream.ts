@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { logout } from '@/features/auth/store/authSlice'
 import { useAppDispatch, useAppSelector } from '@/hooks/store'
 import {
+  batchDetailHydrated,
   initializeBatchRuntime,
   streamConnected,
   streamConnecting,
@@ -10,7 +11,7 @@ import {
   streamFailed,
   streamReconnectScheduled,
 } from '@/features/batches/store/batchDetailsSlice'
-import type { BatchStreamEvent } from '@/features/batches/types'
+import type { BatchDetail, BatchStreamEvent } from '@/features/batches/types'
 
 const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000]
 
@@ -19,6 +20,17 @@ const getApiBaseUrl = () => import.meta.env.VITE_API_BASE_URL ?? '/api'
 const buildBatchStreamUrl = (batchId: string) => {
   const baseUrl = getApiBaseUrl()
   const path = `/batches/${batchId}/stream`
+
+  if (/^https?:\/\//.test(baseUrl)) {
+    return new URL(path.replace(/^\//, ''), `${baseUrl.replace(/\/$/, '')}/`).toString()
+  }
+
+  return `${baseUrl.replace(/\/$/, '')}${path}`
+}
+
+const buildBatchDetailUrl = (batchId: string) => {
+  const baseUrl = getApiBaseUrl()
+  const path = `/batches/${batchId}`
 
   if (/^https?:\/\//.test(baseUrl)) {
     return new URL(path.replace(/^\//, ''), `${baseUrl.replace(/\/$/, '')}/`).toString()
@@ -145,6 +157,27 @@ export const useBatchStream = (batchId?: string) => {
     dispatch(initializeBatchRuntime(batchId))
 
     const connect = async () => {
+      const syncBatchDetail = async () => {
+        try {
+          const response = await fetch(buildBatchDetailUrl(batchId), {
+            method: 'GET',
+            headers: {
+              Accept: 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          })
+
+          if (!response.ok) {
+            return
+          }
+
+          const detail = (await response.json()) as BatchDetail
+          dispatch(batchDetailHydrated(detail))
+        } catch {
+          // Keep the stream alive even if the snapshot refresh fails.
+        }
+      }
+
       while (!abortController.signal.aborted && !isCompleted) {
         dispatch(streamConnecting({ batchId, retryCount }))
 
@@ -185,6 +218,7 @@ export const useBatchStream = (batchId?: string) => {
 
           retryCount = 0
           dispatch(streamConnected({ batchId }))
+          void syncBatchDetail()
 
           await consumeSseStream(
             response.body,
@@ -192,6 +226,7 @@ export const useBatchStream = (batchId?: string) => {
               dispatch(streamEventReceived(event))
 
               if (event.type === 'batch_done') {
+                void syncBatchDetail()
                 isCompleted = true
                 abortController.abort()
               }
@@ -211,7 +246,11 @@ export const useBatchStream = (batchId?: string) => {
               error: 'Conexao com o stream foi interrompida. Tentando novamente.',
             }),
           )
-          await waitForRetry(getReconnectDelay(retryCount), abortController.signal)
+          try {
+            await waitForRetry(getReconnectDelay(retryCount), abortController.signal)
+          } catch {
+            return
+          }
         } catch (error) {
           if (abortController.signal.aborted) {
             return
@@ -225,7 +264,11 @@ export const useBatchStream = (batchId?: string) => {
               error: getStreamErrorMessage(error),
             }),
           )
-          await waitForRetry(getReconnectDelay(retryCount), abortController.signal)
+          try {
+            await waitForRetry(getReconnectDelay(retryCount), abortController.signal)
+          } catch {
+            return
+          }
         }
       }
     }

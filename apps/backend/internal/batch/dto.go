@@ -45,14 +45,17 @@ type StatusCountResponse struct {
 
 type BatchSummaryResponse struct {
 	ID            string              `json:"id"`
+	UserID        string              `json:"user_id"`
 	FileName      string              `json:"file_name"`
 	TotalPayments int                 `json:"total_payments"`
+	Status        string              `json:"status"`
 	StatusCount   StatusCountResponse `json:"status_count"`
 	CreatedAt     time.Time           `json:"created_at"`
 }
 
 type BatchDetailResponse struct {
 	ID            string              `json:"id"`
+	Status        string              `json:"status"`
 	FileName      string              `json:"file_name"`
 	TotalPayments int                 `json:"total_payments"`
 	UserID        string              `json:"user_id"`

@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
 import { useBatchStream } from '@/features/batches/hooks/useBatchStream'
 import { useGetBatchByIdQuery } from '@/features/batches/store/batchApi'
@@ -77,6 +77,12 @@ export default function BatchDetailsPage() {
           Estado inicial do lote hidratado via API e atualizado em tempo real
           por SSE autenticado.
         </p>
+        <div className="admin-batch-detail-header">
+          <p className="admin-batch-detail-note">
+            Volte ao dashboard para acompanhar outros lotes ou enviar um novo arquivo.
+          </p>
+          <Link to="/dashboard">Voltar ao dashboard</Link>
+        </div>
       </section>
 
       <BatchProgressCard

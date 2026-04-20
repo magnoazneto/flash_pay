@@ -27,9 +27,8 @@ const batchStatusOptions: BatchStatusOption[] = [
   { value: 'all', label: 'Todos os status' },
   { value: 'pending', label: 'Pendente' },
   { value: 'processing', label: 'Em processamento' },
-  { value: 'completed', label: 'Concluido' },
-  { value: 'failed', label: 'Falha total' },
-  { value: 'completed_with_failures', label: 'Concluido com falhas' },
+  { value: 'success', label: 'Concluido' },
+  { value: 'failed', label: 'Falha' },
 ]
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
@@ -40,9 +39,8 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
 const statusLabels: Record<Exclude<BatchStatusFilter, 'all'>, string> = {
   pending: 'Pendente',
   processing: 'Em processamento',
-  completed: 'Concluido',
-  failed: 'Falha total',
-  completed_with_failures: 'Concluido com falhas',
+  success: 'Concluido',
+  failed: 'Falha',
 }
 
 const statusPillClassNames: Record<
@@ -51,9 +49,8 @@ const statusPillClassNames: Record<
 > = {
   pending: 'payment-status-badge--pending',
   processing: 'payment-status-badge--processing',
-  completed: 'payment-status-badge--success',
+  success: 'payment-status-badge--success',
   failed: 'payment-status-badge--failed',
-  completed_with_failures: 'payment-status-badge--failed',
 }
 
 const getApiErrorMessage = (error: unknown, fallback: string) => {
@@ -78,37 +75,8 @@ const getApiErrorMessage = (error: unknown, fallback: string) => {
   return apiError.error ?? apiError.message ?? fallback
 }
 
-const getBatchStatus = (batch: AdminBatchSummary): Exclude<
-  BatchStatusFilter,
-  'all'
-> => {
-  const { pending, processing, success, failed } = batch.status_count
-
-  if (processing > 0) {
-    return 'processing'
-  }
-
-  if (pending > 0 && success === 0 && failed === 0) {
-    return 'pending'
-  }
-
-  if (success === batch.total_payments && batch.total_payments > 0) {
-    return 'completed'
-  }
-
-  if (failed > 0 && success === 0) {
-    return 'failed'
-  }
-
-  if (failed > 0) {
-    return 'completed_with_failures'
-  }
-
-  return 'completed'
-}
-
 const getBatchStatusLabel = (batch: AdminBatchSummary) =>
-  statusLabels[getBatchStatus(batch)]
+  statusLabels[batch.status]
 
 const getUserDisplay = (
   batch: AdminBatchSummary,
@@ -187,9 +155,12 @@ export default function AdminBatchesPage() {
     isLoading: isBatchesLoading,
     isFetching: isBatchesFetching,
   } = useGetAdminBatchesQuery(
-    selectedUserId === 'all'
-      ? { limit: 100, offset: 0 }
-      : { limit: 100, offset: 0, userId: selectedUserId },
+    {
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
+      ...(selectedUserId !== 'all' ? { userId: selectedUserId } : {}),
+      ...(selectedStatus !== 'all' ? { status: selectedStatus } : {}),
+    },
     {
       refetchOnMountOrArgChange: 30,
     },
@@ -198,27 +169,18 @@ export default function AdminBatchesPage() {
   const users = usersData?.users ?? []
   const batches = batchesData?.batches ?? []
   const usersById = new Map(users.map((user) => [user.id, user]))
-  const pageSize = PAGE_SIZE
-
-  const filteredBatches =
-    selectedStatus === 'all'
-      ? batches
-      : batches.filter((batch) => getBatchStatus(batch) === selectedStatus)
-
-  const pageCount = Math.max(1, Math.ceil(filteredBatches.length / pageSize))
+  const totalAvailable = batchesData?.total ?? 0
+  const pageCount = Math.max(1, Math.ceil(totalAvailable / PAGE_SIZE))
   const safePage = Math.min(page, pageCount)
-  const startIndex = (safePage - 1) * pageSize
-  const pageBatches = filteredBatches.slice(startIndex, startIndex + pageSize)
-  const groupedBatches = groupBatchesByUser(pageBatches, usersById)
+  const groupedBatches = groupBatchesByUser(batches, usersById)
   const selectedUserLabel =
     selectedUserId === 'all'
       ? 'Todos os usuários'
       : usersById.get(selectedUserId)?.name ?? selectedUserId
   const selectedStatusLabel =
     selectedStatus === 'all' ? 'Todos os status' : statusLabels[selectedStatus]
-  const visibleStart = filteredBatches.length === 0 ? 0 : startIndex + 1
-  const visibleEnd = Math.min(startIndex + pageSize, filteredBatches.length)
-  const totalAvailable = batchesData?.total ?? 0
+  const visibleStart = totalAvailable === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1
+  const visibleEnd = totalAvailable === 0 ? 0 : visibleStart + batches.length - 1
 
   useEffect(() => {
     setPage(1)
@@ -238,9 +200,8 @@ export default function AdminBatchesPage() {
     setPage((current) => Math.min(pageCount, current + 1))
   }
 
-  const hasFilters =
-    selectedUserId !== 'all' || selectedStatus !== 'all' || page !== 1
-  const showNoResults = !isBatchesLoading && filteredBatches.length === 0
+  const hasFilters = selectedUserId !== 'all' || selectedStatus !== 'all'
+  const showNoResults = !isBatchesLoading && totalAvailable === 0
 
   return (
     <main className="dashboard-shell admin-batches-shell">
@@ -254,7 +215,7 @@ export default function AdminBatchesPage() {
 
         <div className="admin-batches-summary">
           <p className="admin-batches-summary-value">
-            {filteredBatches.length} lote{filteredBatches.length === 1 ? '' : 's'} visivel
+            {totalAvailable} resultado{totalAvailable === 1 ? '' : 's'}
           </p>
           <p className="admin-batches-summary-note">
             Filtro atual: {selectedUserLabel} | {selectedStatusLabel}
@@ -323,14 +284,13 @@ export default function AdminBatchesPage() {
           <p className="upload-meta">Carregando lotes administrativos...</p>
         ) : null}
 
-        {isBatchesFetching && batches.length > 0 ? (
+        {isBatchesFetching && !isBatchesLoading && batches.length > 0 ? (
           <p className="batch-history-refresh">Atualizando lotes...</p>
         ) : null}
 
         {!isBatchesLoading && !showNoResults && batches.length > 0 ? (
           <p className="admin-batches-overview">
-            Exibindo {visibleStart}-{visibleEnd} de {filteredBatches.length}
-            lotes carregados{totalAvailable > filteredBatches.length ? ` de ${totalAvailable}` : ''}
+            Exibindo {visibleStart}-{visibleEnd} de {totalAvailable} lotes.
           </p>
         ) : null}
 
@@ -342,7 +302,7 @@ export default function AdminBatchesPage() {
           </p>
         ) : null}
 
-        {pageBatches.length > 0 ? (
+        {batches.length > 0 ? (
           <div className="preview-table-wrapper admin-batches-table-wrapper">
             <table className="preview-table admin-batches-table">
               <thead>
@@ -379,7 +339,7 @@ export default function AdminBatchesPage() {
 
                     {group.batches.map((batch) => {
                       const userDisplay = getUserDisplay(batch, usersById)
-                      const status = getBatchStatus(batch)
+                      const status = batch.status
 
                       return (
                         <tr key={batch.id}>
@@ -421,13 +381,13 @@ export default function AdminBatchesPage() {
           </div>
         ) : null}
 
-        {pageCount > 1 || filteredBatches.length > 0 ? (
+        {pageCount > 1 || totalAvailable > 0 ? (
           <div className="admin-batches-pagination" aria-label="Paginacao de lotes">
             <button
               className="ghost-button"
               type="button"
               onClick={handlePrevPage}
-              disabled={safePage === 1 || filteredBatches.length === 0}
+              disabled={safePage === 1 || totalAvailable === 0}
             >
               Anterior
             </button>
@@ -438,7 +398,7 @@ export default function AdminBatchesPage() {
               className="ghost-button"
               type="button"
               onClick={handleNextPage}
-              disabled={safePage >= pageCount || filteredBatches.length === 0}
+              disabled={safePage >= pageCount || totalAvailable === 0}
             >
               Proxima
             </button>

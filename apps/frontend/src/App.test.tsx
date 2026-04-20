@@ -360,6 +360,9 @@ describe('App protected routes', () => {
       screen.getByRole('heading', { name: 'Detalhes do lote' }),
     ).toBeTruthy()
     expect(screen.getByText('batch-123')).toBeTruthy()
+    expect(
+      screen.getByRole('link', { name: 'Voltar ao dashboard' }),
+    ).toBeTruthy()
   })
 
   it('allows admins to access admin child routes', () => {

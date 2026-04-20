@@ -14,7 +14,7 @@ type Service interface {
 	ProcessUpload(ctx context.Context, userID, fileName string, file io.Reader) (*UploadResponse, error)
 	List(ctx context.Context, userID string, limit, offset int) (*BatchListResponse, error)
 	GetByID(ctx context.Context, batchID, requesterID, requesterRole string) (*BatchDetailResponse, error)
-	ListAll(ctx context.Context, filterUserID string, limit, offset int) (*BatchListResponse, error)
+	ListAll(ctx context.Context, filterUserID, filterStatus string, limit, offset int) (*BatchListResponse, error)
 	Stream(ctx context.Context, batchID, requesterID, requesterRole string) (*Subscription, error)
 }
 
@@ -132,6 +132,7 @@ func (s *service) GetByID(ctx context.Context, batchID, requesterID, requesterRo
 
 	return &BatchDetailResponse{
 		ID:            batch.ID,
+		Status:        batch.Status,
 		FileName:      batch.FileName,
 		TotalPayments: batch.TotalPayments,
 		UserID:        batch.UserID,
@@ -141,10 +142,10 @@ func (s *service) GetByID(ctx context.Context, batchID, requesterID, requesterRo
 	}, nil
 }
 
-func (s *service) ListAll(ctx context.Context, filterUserID string, limit, offset int) (*BatchListResponse, error) {
+func (s *service) ListAll(ctx context.Context, filterUserID, filterStatus string, limit, offset int) (*BatchListResponse, error) {
 	limit, offset = normalizePagination(limit, offset)
 
-	batches, total, err := s.batchRepo.FindAll(ctx, filterUserID, limit, offset)
+	batches, total, err := s.batchRepo.FindAll(ctx, filterUserID, filterStatus, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -196,8 +197,10 @@ func (s *service) buildBatchSummaries(ctx context.Context, batches []BatchRecord
 
 		items = append(items, BatchSummaryResponse{
 			ID:            batch.ID,
+			UserID:        batch.UserID,
 			FileName:      batch.FileName,
 			TotalPayments: batch.TotalPayments,
+			Status:        batch.Status,
 			StatusCount:   mapStatusCount(statusCount),
 			CreatedAt:     batch.CreatedAt,
 		})

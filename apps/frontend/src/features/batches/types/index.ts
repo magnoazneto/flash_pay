@@ -19,21 +19,16 @@ export interface BatchListQueryArgs {
   limit?: number
   offset?: number
   userId?: string
+  status?: BatchPaymentStatus
 }
-
-export type BatchStatusFilter =
-  | 'all'
-  | 'pending'
-  | 'processing'
-  | 'completed'
-  | 'failed'
-  | 'completed_with_failures'
 
 export type BatchPaymentStatus =
   | 'pending'
   | 'processing'
   | 'success'
   | 'failed'
+
+export type BatchStatusFilter = 'all' | BatchPaymentStatus
 
 export interface BatchStatusCount {
   pending: number
@@ -55,6 +50,7 @@ export interface BatchSummary {
   id: string
   file_name: string
   total_payments: number
+  status: BatchPaymentStatus
   status_count: BatchStatusCount
   created_at: string
 }

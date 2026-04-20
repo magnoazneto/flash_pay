@@ -18,6 +18,7 @@ const batchDetailFixture: BatchDetail = {
   id: 'batch-1',
   file_name: 'payments.csv',
   total_payments: 2,
+  status: 'pending',
   user_id: 'user-1',
   created_at: '2026-04-20T10:00:00Z',
   status_count: {
@@ -106,15 +107,67 @@ afterEach(() => {
 })
 
 describe('useBatchStream', () => {
-  it('applies streamed events to redux state and stops after batch_done', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      createSseResponse([
-        'event: payment_updated\n',
-        'data: {"type":"payment_updated","batch_id":"batch-1","payment_id":"payment-1","status":"success","sent_at":"2026-04-20T10:01:00Z"}\n\n',
-        'event: batch_done\n',
-        'data: {"type":"batch_done","batch_id":"batch-1","total_payments":2,"completed_payments":2,"sent_at":"2026-04-20T10:02:00Z"}\n\n',
-      ]),
-    )
+  it('resynchronizes batch details after connecting and completing the stream', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((input) => {
+        const url =
+          typeof input === 'string' ? input : input instanceof Request ? input.url : String(input)
+
+        if (url.endsWith('/batches/batch-1/stream')) {
+          return Promise.resolve(
+            createSseResponse([
+              'event: payment_updated\n',
+              'data: {"type":"payment_updated","batch_id":"batch-1","payment_id":"payment-1","status":"success","sent_at":"2026-04-20T10:01:00Z"}\n\n',
+              'event: batch_done\n',
+              'data: {"type":"batch_done","batch_id":"batch-1","total_payments":2,"completed_payments":2,"sent_at":"2026-04-20T10:02:00Z"}\n\n',
+            ]),
+          )
+        }
+
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 'batch-1',
+              file_name: 'payments.csv',
+              total_payments: 2,
+              status: 'failed',
+              user_id: 'user-1',
+              created_at: '2026-04-20T10:00:00Z',
+              status_count: {
+                pending: 0,
+                processing: 0,
+                success: 1,
+                failed: 1,
+              },
+              payments: [
+                {
+                  id: 'payment-1',
+                  recipient: 'Alice',
+                  amount: '10.00',
+                  status: 'success',
+                  error_message: null,
+                  processed_at: '2026-04-20T10:01:00Z',
+                },
+                {
+                  id: 'payment-2',
+                  recipient: 'Bob',
+                  amount: '20.00',
+                  status: 'failed',
+                  error_message: 'gateway error',
+                  processed_at: '2026-04-20T10:02:00Z',
+                },
+              ],
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            },
+          ),
+        )
+      })
 
     const store = createTestStore()
     store.dispatch(batchDetailHydrated(batchDetailFixture))
@@ -129,7 +182,7 @@ describe('useBatchStream', () => {
       expect(getBatchState(store).stream.status).toBe('completed')
     })
 
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
       headers: {
         Accept: 'text/event-stream',
@@ -142,7 +195,7 @@ describe('useBatchStream', () => {
           pending: 0,
           processing: 0,
           success: 1,
-          failed: 0,
+          failed: 1,
         },
       },
       progress: {
@@ -161,12 +214,56 @@ describe('useBatchStream', () => {
 
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(createSseResponse([]))
-      .mockResolvedValueOnce(
-        createSseResponse([
-          'event: batch_done\n',
-          'data: {"type":"batch_done","batch_id":"batch-1","total_payments":2,"completed_payments":2,"sent_at":"2026-04-20T10:03:00Z"}\n\n',
-        ]),
+      .mockImplementationOnce(() => Promise.resolve(createSseResponse([])))
+      .mockImplementationOnce(
+        () =>
+          Promise.resolve(
+            new Response(
+              JSON.stringify(batchDetailFixture),
+              {
+                status: 200,
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              },
+            ),
+          ),
+      )
+      .mockImplementationOnce(
+        () =>
+          Promise.resolve(
+            createSseResponse([
+              'event: batch_done\n',
+              'data: {"type":"batch_done","batch_id":"batch-1","total_payments":2,"completed_payments":2,"sent_at":"2026-04-20T10:03:00Z"}\n\n',
+            ]),
+          ),
+      )
+      .mockImplementation(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              ...batchDetailFixture,
+              status: 'success',
+              status_count: {
+                pending: 0,
+                processing: 0,
+                success: 2,
+                failed: 0,
+              },
+              payments: batchDetailFixture.payments.map((payment) => ({
+                ...payment,
+                status: 'success',
+                processed_at: '2026-04-20T10:03:00Z',
+              })),
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            },
+          ),
+        ),
       )
 
     const store = createTestStore()
@@ -186,7 +283,7 @@ describe('useBatchStream', () => {
 
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(5)
     expect(getBatchState(store).stream.status).toBe('completed')
   })
 })

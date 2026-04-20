@@ -121,6 +121,7 @@ describe('batchApi', () => {
           id: 'batch-123',
           file_name: 'payments.csv',
           total_payments: 2,
+          status: 'pending',
           user_id: 'operator-1',
           created_at: '2026-04-20T10:00:00Z',
           status_count: {
@@ -172,6 +173,7 @@ describe('batchApi', () => {
               id: 'batch-123',
               file_name: 'payments.csv',
               total_payments: 2,
+              status: 'processing',
               created_at: '2026-04-20T10:00:00Z',
               status_count: {
                 pending: 1,
@@ -224,7 +226,7 @@ describe('batchApi', () => {
     expect((request as Request).headers.get('Authorization')).toBe('Bearer token')
   })
 
-  it('lists admin batches with an optional user filter', async () => {
+  it('lists admin batches with optional user and status filters', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -233,6 +235,7 @@ describe('batchApi', () => {
               id: 'batch-admin-1',
               file_name: 'payments-admin.csv',
               total_payments: 3,
+              status: 'processing',
               user_id: 'operator-1',
               created_at: '2026-04-20T11:00:00Z',
               status_count: {
@@ -267,6 +270,7 @@ describe('batchApi', () => {
         limit: 10,
         offset: 20,
         userId: 'operator-1',
+        status: 'processing',
       }),
     )
 
@@ -278,6 +282,7 @@ describe('batchApi', () => {
         {
           id: 'batch-admin-1',
           file_name: 'payments-admin.csv',
+          status: 'processing',
           user_id: 'operator-1',
         },
       ],
@@ -288,7 +293,7 @@ describe('batchApi', () => {
     expect(request).toBeInstanceOf(Request)
     expect((request as Request).method).toBe('GET')
     expect((request as Request).url).toContain(
-      '/admin/batches?limit=10&offset=20&user_id=operator-1',
+      '/admin/batches?limit=10&offset=20&user_id=operator-1&status=processing',
     )
     expect((request as Request).headers.get('Authorization')).toBe('Bearer token')
   })

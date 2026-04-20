@@ -37,7 +37,11 @@ func (s Service) ListUsers(ctx context.Context, limit, offset int) (*ListUsersRe
 	}, nil
 }
 
-func (s Service) UpdateRole(ctx context.Context, userID, role string) error {
+func (s Service) UpdateRole(ctx context.Context, requesterID, userID, role string) error {
+	if requesterID == userID {
+		return domain.ErrCannotModifyOwnRole
+	}
+
 	return s.repository.UpdateRole(ctx, userID, role)
 }
 

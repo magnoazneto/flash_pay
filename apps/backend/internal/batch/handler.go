@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/flashpay/backend/internal/domain"
@@ -16,6 +17,13 @@ import (
 )
 
 var uuidRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+var allowedBatchStatuses = map[string]struct{}{
+	"pending":    {},
+	"processing": {},
+	"success":    {},
+	"failed":     {},
+}
 
 const maxUploadBodyBytes int64 = 10 << 20
 
@@ -116,8 +124,8 @@ func (h Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) Stream(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
+	controller := http.NewResponseController(w)
+	if err := controller.Flush(); err != nil {
 		respondError(w, http.StatusInternalServerError, "streaming unsupported")
 		return
 	}
@@ -147,7 +155,9 @@ func (h Handler) Stream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
+	if err := controller.Flush(); err != nil {
+		return
+	}
 
 	keepAlive := time.NewTicker(15 * time.Second)
 	defer keepAlive.Stop()
@@ -160,7 +170,9 @@ func (h Handler) Stream(w http.ResponseWriter, r *http.Request) {
 			if _, err := w.Write([]byte(": keep-alive\n\n")); err != nil {
 				return
 			}
-			flusher.Flush()
+			if err := controller.Flush(); err != nil {
+				return
+			}
 		case event, ok := <-subscription.Events():
 			if !ok {
 				return
@@ -169,7 +181,9 @@ func (h Handler) Stream(w http.ResponseWriter, r *http.Request) {
 			if err := writeSSEEvent(w, event); err != nil {
 				return
 			}
-			flusher.Flush()
+			if err := controller.Flush(); err != nil {
+				return
+			}
 		}
 	}
 }
@@ -193,7 +207,15 @@ func (h Handler) ListAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := h.service.ListAll(r.Context(), filterUserID, limit, offset)
+	filterStatus := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("status")))
+	if filterStatus != "" {
+		if !isValidBatchStatus(filterStatus) {
+			respondError(w, http.StatusBadRequest, "invalid status")
+			return
+		}
+	}
+
+	response, err := h.service.ListAll(r.Context(), filterUserID, filterStatus, limit, offset)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "internal server error")
 		return
@@ -209,11 +231,16 @@ func parseQueryInt(r *http.Request, key string, defaultValue int) (int, error) {
 	}
 
 	value, err := strconv.Atoi(raw)
-	if err != nil {
+	if err != nil || value < 0 {
 		return 0, errors.New("invalid " + key)
 	}
 
 	return value, nil
+}
+
+func isValidBatchStatus(status string) bool {
+	_, ok := allowedBatchStatuses[status]
+	return ok
 }
 
 func respondError(w http.ResponseWriter, status int, msg string) {

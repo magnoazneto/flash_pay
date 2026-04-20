@@ -10,8 +10,9 @@ import (
 )
 
 type stubBatchRepository struct {
-	record BatchRecord
-	err    error
+	record    BatchRecord
+	err       error
+	findAllFn func(ctx context.Context, filterUserID, filterStatus string, limit, offset int) ([]BatchRecord, int, error)
 }
 
 func (s stubBatchRepository) CreateBatch(context.Context, string, string, int) (string, time.Time, error) {
@@ -30,8 +31,12 @@ func (s stubBatchRepository) FindByID(context.Context, string) (BatchRecord, err
 	return s.record, nil
 }
 
-func (s stubBatchRepository) FindAll(context.Context, string, int, int) ([]BatchRecord, int, error) {
-	return nil, 0, nil
+func (s stubBatchRepository) FindAll(ctx context.Context, filterUserID, filterStatus string, limit, offset int) ([]BatchRecord, int, error) {
+	if s.findAllFn == nil {
+		return nil, 0, nil
+	}
+
+	return s.findAllFn(ctx, filterUserID, filterStatus, limit, offset)
 }
 
 type stubPaymentRepository struct {
@@ -62,7 +67,7 @@ func TestServiceStreamRejectsForbiddenBatchAccess(t *testing.T) {
 	t.Parallel()
 
 	service := NewService(
-		stubBatchRepository{record: BatchRecord{ID: "batch-1", UserID: "owner-1", TotalPayments: 2}},
+		stubBatchRepository{record: BatchRecord{ID: "batch-1", UserID: "owner-1", TotalPayments: 2, Status: "pending"}},
 		stubPaymentRepository{},
 		nil,
 		NewStreamBroker(),
@@ -78,7 +83,7 @@ func TestServiceStreamReturnsBatchDoneForCompletedBatch(t *testing.T) {
 	t.Parallel()
 
 	service := NewService(
-		stubBatchRepository{record: BatchRecord{ID: "batch-1", UserID: "owner-1", TotalPayments: 2}},
+		stubBatchRepository{record: BatchRecord{ID: "batch-1", UserID: "owner-1", TotalPayments: 2, Status: "pending"}},
 		stubPaymentRepository{count: payment.StatusCount{Success: 1, Failed: 1}},
 		nil,
 		NewStreamBroker(),
@@ -107,5 +112,72 @@ func TestServiceStreamReturnsBatchDoneForCompletedBatch(t *testing.T) {
 
 	if _, ok := <-subscription.Events(); ok {
 		t.Fatal("subscription remained open after synthetic batch_done")
+	}
+}
+
+func TestServiceListAllIncludesAdminBatchFields(t *testing.T) {
+	t.Parallel()
+
+	repo := stubBatchRepository{
+		findAllFn: func(_ context.Context, filterUserID, filterStatus string, limit, offset int) ([]BatchRecord, int, error) {
+			if filterUserID != "user-1" {
+				t.Fatalf("filterUserID = %q, want user-1", filterUserID)
+			}
+			if filterStatus != "failed" {
+				t.Fatalf("filterStatus = %q, want failed", filterStatus)
+			}
+			if limit != 50 || offset != 10 {
+				t.Fatalf("pagination = (%d, %d), want (50, 10)", limit, offset)
+			}
+
+			return []BatchRecord{{
+				ID:            "batch-1",
+				UserID:        "user-1",
+				FileName:      "payments.csv",
+				TotalPayments: 3,
+				Status:        "failed",
+				CreatedAt:     time.Date(2026, time.April, 20, 10, 0, 0, 0, time.UTC),
+			}}, 1, nil
+		},
+	}
+	service := NewService(repo, stubPaymentRepository{count: payment.StatusCount{Failed: 2, Success: 1}}, nil, NewStreamBroker())
+
+	response, err := service.ListAll(context.Background(), "user-1", "failed", 50, 10)
+	if err != nil {
+		t.Fatalf("ListAll returned error: %v", err)
+	}
+
+	if response.Total != 1 || response.Limit != 50 || response.Offset != 10 {
+		t.Fatalf("response pagination = (%d, %d, %d), want (1, 50, 10)", response.Total, response.Limit, response.Offset)
+	}
+	if len(response.Batches) != 1 {
+		t.Fatalf("expected 1 batch, got %d", len(response.Batches))
+	}
+
+	batch := response.Batches[0]
+	if batch.ID != "batch-1" || batch.UserID != "user-1" || batch.Status != "failed" {
+		t.Fatalf("unexpected batch summary: %+v", batch)
+	}
+	if batch.StatusCount.Failed != 2 || batch.StatusCount.Success != 1 {
+		t.Fatalf("unexpected status counts: %+v", batch.StatusCount)
+	}
+}
+
+func TestServiceGetByIDIncludesBatchStatusAndOwner(t *testing.T) {
+	t.Parallel()
+
+	service := NewService(
+		stubBatchRepository{record: BatchRecord{ID: "batch-1", UserID: "owner-1", FileName: "payments.csv", TotalPayments: 2, Status: "processing"}},
+		stubPaymentRepository{count: payment.StatusCount{Processing: 2}},
+		nil,
+		NewStreamBroker(),
+	)
+
+	response, err := service.GetByID(context.Background(), "batch-1", "owner-1", "operator")
+	if err != nil {
+		t.Fatalf("GetByID returned error: %v", err)
+	}
+	if response.UserID != "owner-1" || response.Status != "processing" {
+		t.Fatalf("unexpected detail response: %+v", response)
 	}
 }

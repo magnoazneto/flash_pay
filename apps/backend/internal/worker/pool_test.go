@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"sync"
@@ -351,5 +352,127 @@ func TestPool_BroadcastsStatusUpdatesAndBatchDone(t *testing.T) {
 	doneEvent := events[4]
 	if doneEvent.totalPayments != len(paymentIDs) || doneEvent.completedPayments != len(paymentIDs) {
 		t.Fatalf("batch_done totals = (%d, %d), want (%d, %d)", doneEvent.totalPayments, doneEvent.completedPayments, len(paymentIDs), len(paymentIDs))
+	}
+}
+
+func TestWorkerPoolSizeUsesEnvAndFallsBackForInvalidValues(t *testing.T) {
+	t.Setenv("WORKER_POOL_SIZE", "9")
+	if got := WorkerPoolSize(); got != 9 {
+		t.Fatalf("WorkerPoolSize() = %d, want 9", got)
+	}
+
+	t.Setenv("WORKER_POOL_SIZE", "invalid")
+	if got := WorkerPoolSize(); got != defaultWorkerPoolSize {
+		t.Fatalf("WorkerPoolSize() with invalid env = %d, want %d", got, defaultWorkerPoolSize)
+	}
+
+	t.Setenv("WORKER_POOL_SIZE", "0")
+	if got := WorkerPoolSize(); got != defaultWorkerPoolSize {
+		t.Fatalf("WorkerPoolSize() with zero env = %d, want %d", got, defaultWorkerPoolSize)
+	}
+}
+
+func TestNewPoolFallsBackToEnvConfiguredWorkerCountAndDefaultLogger(t *testing.T) {
+	t.Setenv("WORKER_POOL_SIZE", "7")
+	pool := NewPool(newMockRepository(nil), gateway.MockGateway{}, nil, nil, 0)
+
+	if pool.numWorkers != 7 {
+		t.Fatalf("pool.numWorkers = %d, want 7", pool.numWorkers)
+	}
+	if pool.logger == nil {
+		t.Fatal("expected logger to be initialized")
+	}
+}
+
+func TestPool_DispatchWithNoPaymentsPublishesBatchDone(t *testing.T) {
+	t.Parallel()
+
+	broadcaster := &mockBroadcaster{}
+	pool := NewPool(newMockRepository(nil), gateway.MockGateway{}, broadcaster, newTestLogger(), 0)
+
+	pool.Dispatch("batch-empty", nil)
+
+	events := broadcaster.snapshot()
+	if len(events) != 1 {
+		t.Fatalf("broadcast event count = %d, want 1", len(events))
+	}
+	if events[0].kind != "batch_done" {
+		t.Fatalf("event kind = %s, want batch_done", events[0].kind)
+	}
+	if events[0].totalPayments != 0 || events[0].completedPayments != 0 {
+		t.Fatalf("batch_done totals = (%d, %d), want (0, 0)", events[0].totalPayments, events[0].completedPayments)
+	}
+}
+
+func TestPool_ProcessStopsWhenProcessingStatusUpdateFails(t *testing.T) {
+	t.Parallel()
+
+	repo := newMockRepository([]string{"payment-1"})
+	repo.updateStatusErr["payment-1:processing"] = errors.New("boom")
+	broadcaster := &mockBroadcaster{}
+	pool := NewPool(repo, gateway.MockGateway{}, broadcaster, newTestLogger(), 1)
+
+	pool.process(context.Background(), "batch-1", "payment-1")
+
+	state := repo.snapshot("payment-1")
+	if state.status != "pending" {
+		t.Fatalf("payment status = %s, want pending", state.status)
+	}
+	if state.processedAt {
+		t.Fatal("expected processedAt to remain false")
+	}
+	if len(broadcaster.snapshot()) != 0 {
+		t.Fatal("expected no events when processing status update fails")
+	}
+}
+
+func TestPool_ProcessStopsWhenTerminalStatusUpdateFails(t *testing.T) {
+	t.Parallel()
+
+	repo := newMockRepository([]string{"payment-1"})
+	repo.updateStatusErr["payment-1:success"] = errors.New("boom")
+	broadcaster := &mockBroadcaster{}
+	pool := NewPool(repo, gateway.MockGateway{ShouldFail: false}, broadcaster, newTestLogger(), 1)
+
+	pool.process(context.Background(), "batch-1", "payment-1")
+
+	state := repo.snapshot("payment-1")
+	if state.status != "processing" {
+		t.Fatalf("payment status = %s, want processing", state.status)
+	}
+	if state.processedAt {
+		t.Fatal("expected processedAt to remain false")
+	}
+
+	events := broadcaster.snapshot()
+	if len(events) != 1 || events[0].status != "processing" {
+		t.Fatalf("unexpected events after terminal update failure: %+v", events)
+	}
+}
+
+func TestPool_ProcessContinuesWhenProcessedAtUpdateFails(t *testing.T) {
+	t.Parallel()
+
+	repo := newMockRepository([]string{"payment-1"})
+	repo.setProcessedAtErr["payment-1"] = errors.New("boom")
+	broadcaster := &mockBroadcaster{}
+	pool := NewPool(repo, gateway.MockGateway{ShouldFail: false}, broadcaster, newTestLogger(), 1)
+
+	pool.process(context.Background(), "batch-1", "payment-1")
+
+	state := repo.snapshot("payment-1")
+	if state.status != "success" {
+		t.Fatalf("payment status = %s, want success", state.status)
+	}
+	if state.processedAt {
+		t.Fatal("expected processedAt to remain false when SetProcessedAt fails")
+	}
+
+	events := broadcaster.snapshot()
+	if len(events) != 2 {
+		t.Fatalf("event count = %d, want 2", len(events))
+	}
+	if events[0].status != "processing" || events[1].status != "success" {
+		t.Fatalf("unexpected event sequence: %+v", events)
 	}
 }

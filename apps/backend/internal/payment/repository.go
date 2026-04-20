@@ -48,7 +48,7 @@ func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
 }
 
 func (r *PostgresRepository) UpdateStatus(ctx context.Context, paymentID, status string, errorMessage *string) error {
-	const query = `
+	const updatePaymentQuery = `
 		UPDATE payments
 		SET status = $2::payment_status,
 		    error_message = NULLIF($3, ''),
@@ -56,8 +56,46 @@ func (r *PostgresRepository) UpdateStatus(ctx context.Context, paymentID, status
 		WHERE id = $1
 	`
 
-	_, err := r.pool.Exec(ctx, query, paymentID, status, errorMessage)
-	return err
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, updatePaymentQuery, paymentID, status, errorMessage); err != nil {
+		return err
+	}
+
+	const updateBatchStatusQuery = `
+		UPDATE batches
+		SET status = CASE
+			WHEN counts.processing > 0 THEN 'processing'::payment_status
+			WHEN counts.pending > 0 THEN 'pending'::payment_status
+			WHEN counts.failed > 0 THEN 'failed'::payment_status
+			ELSE 'success'::payment_status
+		END,
+		    updated_at = NOW()
+		FROM (
+			SELECT p.batch_id,
+			       COUNT(*) FILTER (WHERE p.status = 'pending') AS pending,
+			       COUNT(*) FILTER (WHERE p.status = 'processing') AS processing,
+			       COUNT(*) FILTER (WHERE p.status = 'failed') AS failed
+			FROM payments p
+			WHERE p.batch_id = (
+				SELECT batch_id
+				FROM payments
+				WHERE id = $1
+			)
+			GROUP BY p.batch_id
+		) AS counts
+		WHERE batches.id = counts.batch_id
+	`
+
+	if _, err := tx.Exec(ctx, updateBatchStatusQuery, paymentID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (r *PostgresRepository) SetProcessedAt(ctx context.Context, paymentID string) error {

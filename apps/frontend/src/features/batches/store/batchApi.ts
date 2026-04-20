@@ -40,6 +40,7 @@ export const batchApi = baseApi.injectEndpoints({
           limit: params?.limit ?? 100,
           offset: params?.offset ?? 0,
           ...(params?.userId ? { user_id: params.userId } : {}),
+          ...(params?.status ? { status: params.status } : {}),
         },
       }),
     }),

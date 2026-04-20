@@ -71,8 +71,9 @@ func (h Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	requesterID := apimiddleware.GetUserID(r.Context())
 	userID := chi.URLParam(r, "id")
-	if err := h.service.UpdateRole(r.Context(), userID, role); err != nil {
+	if err := h.service.UpdateRole(r.Context(), requesterID, userID, role); err != nil {
 		h.writeError(w, err)
 		return
 	}
@@ -98,6 +99,8 @@ func (h Handler) writeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, domain.ErrCannotDeleteSelf):
 		respondError(w, http.StatusUnprocessableEntity, domain.ErrCannotDeleteSelf.Error())
+	case errors.Is(err, domain.ErrCannotModifyOwnRole):
+		respondError(w, http.StatusUnprocessableEntity, domain.ErrCannotModifyOwnRole.Error())
 	case errors.Is(err, domain.ErrUserNotFound):
 		respondError(w, http.StatusNotFound, domain.ErrUserNotFound.Error())
 	default:

@@ -13,7 +13,7 @@ type BatchRepository interface {
 	CreateBatch(ctx context.Context, userID, fileName string, totalPayments int) (string, time.Time, error)
 	FindByUserID(ctx context.Context, userID string, limit, offset int) ([]BatchRecord, int, error)
 	FindByID(ctx context.Context, id string) (BatchRecord, error)
-	FindAll(ctx context.Context, filterUserID string, limit, offset int) ([]BatchRecord, int, error)
+	FindAll(ctx context.Context, filterUserID, filterStatus string, limit, offset int) ([]BatchRecord, int, error)
 }
 
 type BatchRecord struct {
@@ -21,6 +21,7 @@ type BatchRecord struct {
 	UserID        string
 	FileName      string
 	TotalPayments int
+	Status        string
 	CreatedAt     time.Time
 }
 
@@ -56,6 +57,7 @@ func (r *PostgresRepository) FindByUserID(ctx context.Context, userID string, li
 		       user_id::text,
 		       file_name,
 		       total_payments,
+		       status::text,
 		       created_at,
 		       COUNT(*) OVER()
 		FROM batches
@@ -79,6 +81,7 @@ func (r *PostgresRepository) FindByID(ctx context.Context, id string) (BatchReco
 		       user_id::text,
 		       file_name,
 		       total_payments,
+		       status::text,
 		       created_at
 		FROM batches
 		WHERE id = $1
@@ -90,6 +93,7 @@ func (r *PostgresRepository) FindByID(ctx context.Context, id string) (BatchReco
 		&batch.UserID,
 		&batch.FileName,
 		&batch.TotalPayments,
+		&batch.Status,
 		&batch.CreatedAt,
 	)
 	if err != nil {
@@ -102,21 +106,23 @@ func (r *PostgresRepository) FindByID(ctx context.Context, id string) (BatchReco
 	return batch, nil
 }
 
-func (r *PostgresRepository) FindAll(ctx context.Context, filterUserID string, limit, offset int) ([]BatchRecord, int, error) {
+func (r *PostgresRepository) FindAll(ctx context.Context, filterUserID, filterStatus string, limit, offset int) ([]BatchRecord, int, error) {
 	const query = `
 		SELECT id::text,
 		       user_id::text,
 		       file_name,
 		       total_payments,
+		       status::text,
 		       created_at,
 		       COUNT(*) OVER()
 		FROM batches
 		WHERE ($1 = '' OR user_id = $1::uuid)
+		  AND ($2 = '' OR status = $2::payment_status)
 		ORDER BY created_at DESC
-		LIMIT $2 OFFSET $3
+		LIMIT $3 OFFSET $4
 	`
 
-	rows, err := r.pool.Query(ctx, query, filterUserID, limit, offset)
+	rows, err := r.pool.Query(ctx, query, filterUserID, filterStatus, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -138,6 +144,7 @@ func scanBatchRows(rows pgx.Rows) ([]BatchRecord, int, error) {
 			&batch.UserID,
 			&batch.FileName,
 			&batch.TotalPayments,
+			&batch.Status,
 			&batch.CreatedAt,
 			&rowTotal,
 		); err != nil {
